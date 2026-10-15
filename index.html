@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Farm Book</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="theme-color" content="#2E6A4E">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -13,7 +17,12 @@
   --good:#2E7D4F; --goodbg:#DDEEE3; --warn:#9A5C10; --warnbg:#F6E8D2; --bad:#B23A30; --badbg:#F5DAD6;
   --display:'Bricolage Grotesque','Source Sans 3',system-ui,sans-serif;
   --body:'Source Sans 3',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
 }
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#101713; --surface:#18221C; --fg:#E6EDE7; --muted:#9AA89E; --line:#2A372E; --soft:#1F2B24;
   --accent:#6FBF94; --accent-fg:#0E1A13;
@@ -80,7 +89,8 @@ input,select,textarea{font:400 1rem var(--body);background:var(--bg);color:var(-
 pre.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:160px;font-size:.75rem;margin:0}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
-
+</head>
+<body>
 <div class="wrap" id="app"></div>
 <div id="sheetHost"></div>
 <nav class="nav" aria-label="Sections"><div id="nav"></div></nav>
@@ -458,3 +468,5 @@ db=load();render();
 try{if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
 })();
 </script>
+</body>
+</html>
