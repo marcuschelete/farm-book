@@ -86,6 +86,7 @@ input,select,textarea{font:400 1rem var(--body);background:var(--bg);color:var(-
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .warnbox{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:10px;font-weight:600;font-size:.9rem}
 .empty{color:var(--muted);padding:8px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:99px;z-index:30;font-weight:600;max-width:90%;text-align:center}
 pre.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:160px;font-size:.75rem;margin:0}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
@@ -118,9 +119,9 @@ function dshort(s){if(!s)return '';var m=['Jan','Feb','Mar','Apr','May','Jun','J
 function ageStr(b){if(!b)return '';var d=diff(b,today());if(d<0)return '';if(d<60)return d+' d';var m=Math.floor(d/30.44);return m<24?m+' mo':Math.floor(m/12)+' y '+(m%12)+' mo'}
 
 /* ---------- storage ---------- */
-function blank(){return {v:1,example:false,animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[]}}
+function blank(){return {v:1,example:false,created:today(),lastBackup:'',animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[]}}
 function load(){
-  try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.animals)return o}}catch(e){}
+  try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.animals){o.created=o.created||today();o.lastBackup=o.lastBackup||'';return o}}}catch(e){}
   return seed();
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
@@ -275,10 +276,61 @@ function vMoney(){
   return h;
 }
 
+/* ---------- backup ---------- */
+function hasRecords(){return db.animals.length+db.tx.length+db.treatments.length+db.schedules.length>0}
+function backupDue(){
+  if(db.example||!hasRecords())return null;
+  if(db.lastBackup){var d=diff(db.lastBackup,today());return d>=7?{text:'Last backup was '+d+' days ago',days:d}:null}
+  return diff(db.created,today())>=3?{text:'You have not backed up yet',days:null}:null;
+}
+function backupStatus(){
+  if(!db.lastBackup)return 'Not backed up yet';
+  var d=diff(db.lastBackup,today());
+  return 'Last backup: '+(d<=0?'today':d===1?'yesterday':d+' days ago');
+}
+function markBackup(){db.lastBackup=today();save();render()}
+function toast(msg){
+  var old=document.getElementById('toast');if(old)old.remove();
+  var t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){var x=document.getElementById('toast');if(x)x.remove()},4500);
+}
+function backupText(){return JSON.stringify(db)}
+function backupName(){return 'farm-book-backup-'+today()+'.txt'}
+function downloadText(name,text,type){
+  var b=new Blob([text],{type:type});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();
+}
+function doImport(v){
+  try{
+    var o=JSON.parse(String(v).trim());
+    if(!o||!Array.isArray(o.animals)||!Array.isArray(o.tx))throw 0;
+    o.example=false;o.created=o.created||today();o.lastBackup=today();
+    db=o;save();render();toast('Restored '+db.animals.length+' animal records and '+db.tx.length+' transactions.');
+  }catch(e){toast('That does not look like a Farm Book backup.')}
+}
+function reminderLinks(){
+  var start=addDays(today(),7).replace(/-/g,'');
+  var text='Back up Farm Book',det='Open Farm Book, tap Backup, then tap Share backup and send it to WhatsApp or email.';
+  var g='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(text)+'&details='+encodeURIComponent(det)+'&dates='+start+'T180000/'+start+'T181500&recur='+encodeURIComponent('RRULE:FREQ=WEEKLY');
+  return g;
+}
+function icsText(){
+  var start=addDays(today(),7).replace(/-/g,'');
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Farm Book//EN','BEGIN:VEVENT','UID:farmbook-backup-'+uid()+'@farmbook','DTSTAMP:'+today().replace(/-/g,'')+'T000000Z',
+    'DTSTART:'+start+'T180000','DTEND:'+start+'T181500','RRULE:FREQ=WEEKLY','SUMMARY:Back up Farm Book','DESCRIPTION:Open Farm Book\\, tap Backup\\, then tap Share backup.',
+    'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Back up Farm Book','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+}
+
 function vMore(){
+  var due=backupDue();
   var h='<h2>Backup and data</h2>';
-  h+='<div class="card"><h3>Back up</h3><div class="small muted">Records live on this phone only. Copy a backup now and then, and keep it in a message to yourself or in email.</div><div class="row"><button class="btn pri" data-a="export" style="flex:1">Copy backup</button><button class="btn" data-a="download" style="flex:1">Download file</button></div><div id="expMsg" class="small muted"></div></div>';
-  h+='<div class="card"><h3>Restore</h3><label class="f">Paste a backup here<textarea id="impTxt" rows="4" placeholder="Paste the copied backup"></textarea></label><button class="btn" data-a="import">Restore from backup</button><div id="impMsg" class="small muted"></div></div>';
+  h+='<div class="card"><h3>Back up your records</h3><div class="row"><span class="pill '+(due?'warn':db.lastBackup?'good':'')+'">'+backupStatus()+'</span></div>'+
+    '<div class="small muted">Your records live only on this phone. Send a backup to yourself on WhatsApp, email or Google Drive, and you can restore it on any phone.</div>'+
+    '<button class="btn pri" data-a="share">Share backup</button>'+
+    '<div class="row"><button class="btn" data-a="export" style="flex:1">Copy as text</button><button class="btn" data-a="download" style="flex:1">Save to phone</button></div></div>';
+  h+='<div class="card"><h3>Remind me to back up</h3><div class="small muted">Adds a weekly reminder to your calendar, so your phone alerts you even when the app is closed.</div>'+
+    '<a class="btn pri" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="'+esc(reminderLinks())+'">Add weekly reminder (Google Calendar)</a>'+
+    '<button class="btn" data-a="ics">Other calendar apps</button></div>';
+  h+='<div class="card"><h3>Restore</h3><label class="f">Choose a backup file<input type="file" id="impFile" accept=".txt,.json,text/plain,application/json"></label><label class="f">Or paste the backup text<textarea id="impTxt" rows="3" placeholder="Paste the copied backup"></textarea></label><button class="btn" data-a="import">Restore from pasted text</button><div class="small muted">Restoring replaces the records on this phone.</div></div>';
   h+='<div class="card"><h3>Start fresh</h3><div class="small muted">'+(db.example?'The records you see now are examples. ':'')+'This removes all records on this device.</div>'+
     (confirmKey==='wipe'?'<div class="row"><button class="btn bad" data-a="wipe2" style="flex:1">Yes, remove everything</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="wipe1">'+(db.example?'Clear examples and start':'Remove all records')+'</button>')+'</div>';
   h+='<div class="card"><h3>Install on your phone</h3><div class="small muted">Open this page in Chrome, tap the menu, then Add to Home screen. After the first load it also opens without signal.</div></div>';
@@ -289,8 +341,10 @@ function render(){
   var app=document.getElementById('app');
   var head='<div class="top"><div><h1>Farm Book</h1><small>'+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})+'</small></div><div class="num" style="text-align:right"><b style="font-family:var(--display);font-size:1.4rem">'+count()+'</b><small>animals</small></div></div>';
   var ban=db.example?'<div class="banner"><span>Showing example records</span><button class="btn sm" data-a="tab" data-v="more">Start with my own</button></div>':'';
+  var bd=backupDue();
+  var bban=bd?'<div class="banner"><span>'+bd.text+'. Back up now so you do not lose records.</span><button class="btn sm" data-a="share">Back up</button></div>':'';
   var v={home:vHome,animals:vAnimals,health:vHealth,money:vMoney,more:vMore}[tab]();
-  app.innerHTML=head+ban+v;
+  app.innerHTML=head+ban+bban+v;
   document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[2]]+t[1]+'</button>'}).join('');
 }
 
@@ -438,18 +492,24 @@ var actions={
  cancelc:function(){confirmKey=null;render()},
  wipe2:function(){db=blank();confirmKey=null;save();tab='home';render()},
  export:function(){
-  var txt=JSON.stringify(db),m=document.getElementById('expMsg');
-  function fb(){m.innerHTML='Select and copy:<pre class="code" id="expPre"></pre>';var pre=document.getElementById('expPre');pre.textContent=txt;try{var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r)}catch(e){}}
-  try{navigator.clipboard.writeText(txt).then(function(){m.textContent='Backup copied. Paste it somewhere safe.'},fb)}catch(e){fb()}
+  var txt=backupText();
+  function fb(){var m=document.getElementById('expMsg');if(m){m.innerHTML='Select and copy:<pre class="code" id="expPre"></pre>';var pre=document.getElementById('expPre');pre.textContent=txt}else toast('Could not copy. Use Save to phone.')}
+  try{navigator.clipboard.writeText(txt).then(function(){markBackup();toast('Backup copied. Paste it into a WhatsApp message to yourself.')},fb)}catch(e){fb()}
  },
  download:function(){
-  try{var b=new Blob([JSON.stringify(db,null,1)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='farm-book-'+today()+'.json';document.body.appendChild(a);a.click();a.remove();document.getElementById('expMsg').textContent='If no file appeared, use Copy backup instead.'}catch(e){document.getElementById('expMsg').textContent='Download is not available here. Use Copy backup.'}
+  try{downloadText(backupName(),backupText(),'text/plain');markBackup();toast('Saved to your Downloads. Send that file to yourself too.')}catch(e){toast('Saving is not available here. Use Copy as text.')}
  },
- import:function(){
-  var m=document.getElementById('impMsg'),v=document.getElementById('impTxt').value.trim();
-  try{var o=JSON.parse(v);if(!o||!Array.isArray(o.animals)||!Array.isArray(o.tx))throw 0;o.example=false;db=o;save();m.textContent='Restored '+db.animals.length+' animal records and '+db.tx.length+' transactions.';render()}
-  catch(e){m.textContent='That does not look like a Farm Book backup.'}
- }
+ share:function(){
+  var txt=backupText(),f=null;
+  try{f=new File([txt],backupName(),{type:'text/plain'})}catch(e){}
+  if(f&&navigator.canShare&&navigator.canShare({files:[f]})){
+    navigator.share({files:[f],title:'Farm Book backup',text:'Farm Book backup '+today()}).then(function(){markBackup();toast('Backup shared.')},function(err){if(!err||err.name!=='AbortError')toast('Sharing failed. Try Copy as text.')});
+    return;
+  }
+  try{downloadText(backupName(),txt,'text/plain');markBackup();toast('Sharing is not available here, so the backup was saved to Downloads. Send that file to yourself.')}catch(e){toast('Could not back up. Try Copy as text.')}
+ },
+ ics:function(){try{downloadText('farm-book-reminder.ics',icsText(),'text/calendar');toast('Open the downloaded file to add the reminder to your calendar.')}catch(e){toast('Not available here. Use the Google Calendar button.')}},
+ import:function(){var el=document.getElementById('impTxt');if(!el||!el.value.trim()){toast('Paste a backup first, or choose a file.');return}doImport(el.value)}
 };
 document.addEventListener('click',function(e){
   var el=e.target.closest('[data-a]');if(!el)return;
@@ -461,10 +521,13 @@ document.addEventListener('submit',function(e){
   forms[form.dataset.form](fd(form));
   save();closeSheet();render();
 });
-document.addEventListener('change',function(e){if(e.target.closest('#evForm'))syncEvent();
+document.addEventListener('change',function(e){
+  if(e.target.id==='impFile'&&e.target.files&&e.target.files[0]){var r=new FileReader();r.onload=function(){doImport(r.result)};r.onerror=function(){toast('Could not read that file.')};r.readAsText(e.target.files[0]);return}
+  if(e.target.closest('#evForm'))syncEvent();
   if(e.target.form&&e.target.form.id==='txForm'&&e.target.name==='dir'){var c=e.target.form.elements.cat;c.innerHTML=opts(e.target.value==='in'?INCATS:OUTCATS,e.target.value==='in'?'Sales':'Feed')}});
 
 db=load();render();
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 try{if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
 })();
 </script>

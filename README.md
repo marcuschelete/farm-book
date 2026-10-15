@@ -14,7 +14,7 @@ Your records are saved on your own phone only. Use **Backup > Copy backup** now 
 - Vaccine, dewormer and dip schedules with due dates and a withdrawal-period warning
 - Feed purchases with an early/late rhythm check
 - Spending by category, sales and net per month
-- Backup and restore
+- Share a backup to WhatsApp, email or Drive, weekly calendar reminder, and restore on any phone
 
 ## Feedback
 
