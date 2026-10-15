@@ -6,7 +6,7 @@ A simple app for keeping farm records on your phone: animal numbers, vaccination
 
 Open the app link in Chrome on your phone, tap the menu, then **Add to Home screen**.
 
-Your records are saved on your own phone only. Use **Backup > Copy backup** now and then and keep the copy somewhere safe.
+Your records are saved on your own phone only. Use **Backup > Share backup** now and then and send the file to yourself on WhatsApp or email.
 
 ## Features
 
