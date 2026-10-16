@@ -89,6 +89,28 @@ input,select,textarea{font:400 1rem var(--body);background:var(--bg);color:var(-
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:99px;z-index:30;font-weight:600;max-width:90%;text-align:center}
 pre.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:160px;font-size:.75rem;margin:0}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sum3 .tile{padding:8px 10px;min-width:0}
+.sum3 .tile b{font-size:1.05rem;overflow-wrap:anywhere}
+.sum3 .tile span{font-size:.7rem;letter-spacing:.04em}
+.monthbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.monthbar b{font:700 1.1rem var(--display)}
+.monthbar .btn{min-width:44px;font-size:1.2rem;line-height:1}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .wd{text-align:center;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;padding:2px 0}
+.day{position:relative;min-height:54px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:4px 1px;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;cursor:pointer;min-width:0}
+.day .dn{font-size:.85rem;font-weight:600}
+.day .da{font-size:.68rem;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.day .da.neg{color:var(--bad)}.day .da.pos{color:var(--good)}
+.day.today{border-color:var(--accent);border-width:2px}
+.day.sel{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.day.sel .da{color:inherit}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--warn);display:block;position:absolute;top:4px;right:4px}
+.day.sel .dot{background:var(--accent-fg)}
+.day:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rm{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.rm .row{width:100%}
 </style>
 </head>
 <body>
@@ -104,33 +126,53 @@ var SPECIES=['Cattle','Goats','Sheep','Chickens','Other'];
 var TYPES=['Vaccine','Dewormer','Dip / tick','Spray','Medicine'];
 var OUTCATS=['Feed','Health','Animals','Equipment','Labour','Other'];
 var INCATS=['Sales','Other'];
-var EVT={bought:'Bought',born:'Born',sold:'Sold',eaten:'Eaten at home',died:'Died'};
-var db, tab='home', cur=null, flt='All', showPast=false, period='month', confirmKey=null;
+var EVT={bought:'Bought',born:'Born',existing:'Already on the farm',sold:'Sold',eaten:'Eaten at home',died:'Died'};
+var FREQ={monthly:'Every month',fortnightly:'Every 2 weeks',weekly:'Every week'};
+var SRC={born:'born here',bought:'bought',existing:'on the farm'};
+var db, tab='home', cur=null, flt='All', showPast=false, period='month', confirmKey=null, calMonth='', calDay='';
 
 function p2(n){return (n<10?'0':'')+n}
 function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
 function toUTC(s){var a=s.split('-');return Date.UTC(+a[0],+a[1]-1,+a[2])}
 function addDays(s,n){var d=new Date(toUTC(s)+n*864e5);return d.getUTCFullYear()+'-'+p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate())}
 function diff(a,b){return Math.round((toUTC(b)-toUTC(a))/864e5)}
+function ymd(y,m,d){return y+'-'+p2(m)+'-'+p2(d)}
+function dim(y,m){return new Date(y,m,0).getDate()}
 function uid(){return Math.random().toString(36).slice(2,9)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function money(n){return 'P '+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+function cmp(n){var a=Math.abs(n);return a>=10000?Math.round(a/1000)+'k':a>=1000?(Math.round(a/100)/10)+'k':String(Math.round(a))}
 function dshort(s){if(!s)return '';var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var a=s.split('-');return +a[2]+' '+m[+a[1]-1]+(a[0]!==today().slice(0,4)?' '+a[0]:'')}
+function dlong(s){return new Date(toUTC(s)).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}
 function ageStr(b){if(!b)return '';var d=diff(b,today());if(d<0)return '';if(d<60)return d+' d';var m=Math.floor(d/30.44);return m<24?m+' mo':Math.floor(m/12)+' y '+(m%12)+' mo'}
+function E(s){return {err:s}}
 
 /* ---------- storage ---------- */
-function blank(){return {v:1,example:false,created:today(),lastBackup:'',animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[]}}
+function blank(){return {v:2,example:false,created:today(),lastBackup:'',animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[],recurring:[]}}
+function fix(o){
+  o.created=o.created||today();o.lastBackup=o.lastBackup||'';
+  ['products','schedules','treatments','stock','tx','recurring'].forEach(function(k){if(!Array.isArray(o[k]))o[k]=[]});
+  o.animals.forEach(function(a){
+    if(!a.kind)a.kind=(a.qty===1&&a.tag)?'individual':'group';
+    if(a.kind==='individual'){a.qty=1;a.motherId=a.motherId||'';a.fatherId=a.fatherId||'';if(!a.sex||a.sex==='Mixed')a.sex='Unknown'}
+  });
+  return o;
+}
 function load(){
-  try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.animals){o.created=o.created||today();o.lastBackup=o.lastBackup||'';return o}}}catch(e){}
+  try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.animals)return fix(o)}}catch(e){}
   return seed();
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
 
 function seed(){
   var t=today(), d=blank(); d.example=true;
-  function an(tag,sp,sex,qty,src,birth){var a={id:uid(),tag:tag,species:sp,sex:sex,qty:qty,source:src,birth:birth||'',status:'active'};d.animals.push(a);return a}
-  an('Herd A','Cattle','Mixed',12,'bought','');an('Bull 01','Cattle','Male',1,'bought',addDays(t,-1500));an('Herd B','Goats','Mixed',38,'bought','');
-  an('Kids 2026','Goats','Mixed',9,'born',addDays(t,-70));an('Flock A','Sheep','Mixed',25,'bought','');an('Layers','Chickens','Female',60,'bought','');
+  function an(tag,sp,sex,qty,src,birth,kind,m,f){var a={id:uid(),tag:tag,species:sp,sex:sex,qty:qty,source:src,birth:birth||'',status:'active',kind:kind||'group',motherId:m||'',fatherId:f||''};d.animals.push(a);return a}
+  an('Herd A','Cattle','Mixed',12,'bought','');an('Bull 01','Cattle','Male',1,'bought',addDays(t,-1500),'individual');an('Herd B','Goats','Mixed',38,'bought','');
+  an('Kids 2026','Goats','Mixed',9,'born',addDays(t,-70));
+  var dam=an('G-224','Goats','Female',1,'existing',addDays(t,-900),'individual');
+  var sire=an('G-337','Goats','Male',1,'existing',addDays(t,-1100),'individual');
+  an('G-4567','Goats','Male',1,'born',addDays(t,-70),'individual',dam.id,sire.id);
+  an('Flock A','Sheep','Mixed',25,'bought','');an('Layers','Chickens','Female',60,'bought','');
   function pr(n,ty,w){var p={id:uid(),name:n,type:ty,withdrawal:w};d.products.push(p);return p}
   function sc(p,target,iv,dose,last){d.schedules.push({id:uid(),productId:p.id,target:target,interval:iv,dose:dose,last:last,next:addDays(last,iv)})}
   var fmd=pr('FMD vaccine','Vaccine',0), dip=pr('Tick dip','Dip / tick',7), iver=pr('Ivermectin','Dewormer',28), nc=pr('Newcastle vaccine','Vaccine',0), pk=pr('Pulpy kidney vaccine','Vaccine',0);
@@ -146,7 +188,10 @@ function seed(){
   tx('out',-70,'Feed',1850,'Lucerne bales','Feed store');tx('out',-48,'Feed',1900,'Lucerne bales','Feed store');tx('out',-26,'Feed',1820,'Mixed feed','Feed store');tx('out',-14,'Feed',1200,'Layer mash','Feed store');
   tx('out',-12,'Health',640,'Vaccines and dip','Vet shop');tx('out',-40,'Health',480,'Dewormer','Vet shop');tx('out',-33,'Animals',2600,'3 goats','Neighbour');
   tx('in',-20,'Sales',3200,'2 goats sold','');tx('out',-5,'Labour',400,'Fence repair','');
+  var rs=addDays(t,-65);
+  d.recurring.push({id:uid(),dir:'out',cat:'Labour',amount:1500,item:'Farm hand wages',supplier:'',freq:'monthly',start:rs,dom:+rs.slice(8),lastGen:null,active:true});
   d.stock.push({id:uid(),date:addDays(t,-70),type:'born',species:'Goats',qty:9,who:'',price:0,note:'Kids 2026'});
+  d.stock.push({id:uid(),date:addDays(t,-70),type:'born',species:'Goats',qty:1,who:'',price:0,note:'G-4567'});
   d.stock.push({id:uid(),date:addDays(t,-33),type:'bought',species:'Goats',qty:3,who:'Neighbour',price:2600,note:''});
   d.stock.push({id:uid(),date:addDays(t,-20),type:'sold',species:'Goats',qty:2,who:'Local buyer',price:3200,note:''});
   return d;
@@ -155,7 +200,12 @@ function seed(){
 /* ---------- helpers ---------- */
 function active(){return db.animals.filter(function(a){return a.status==='active'})}
 function count(sp){return active().filter(function(a){return !sp||a.species===sp}).reduce(function(s,a){return s+a.qty},0)}
+function isInd(a){return a.kind==='individual'}
 function aLabel(a){return a.tag||(a.species+' group')}
+function aById(id){return id?db.animals.find(function(a){return a.id===id}):null}
+function tagTaken(tag,exceptId){var k=tag.trim().toLowerCase();return db.animals.some(function(a){return a.id!==exceptId&&a.tag&&a.tag.trim().toLowerCase()===k})}
+function parentsLine(a){var m=aById(a.motherId),f=aById(a.fatherId),p=[];if(m)p.push('Mother '+m.tag);if(f)p.push('Father '+f.tag);return p.join(' · ')}
+function tLabel(t){var a=t.animalId?aById(t.animalId):null;return a?aLabel(a):t.target}
 function prod(id){return db.products.find(function(p){return p.id===id})}
 function sdays(s){return diff(today(),s.next)}
 function pillFor(days){
@@ -188,15 +238,96 @@ function feedInfo(){
   });
   return {rows:rows,avg:avg,last:f.length?f[f.length-1]:null};
 }
-function withdrawalWarn(species,date){
+function withdrawalWarn(a,date){
   var out=[];
   db.treatments.forEach(function(t){
     if(!t.withdrawal)return;
-    if(t.target!=='All'&&t.target!==species)return;
+    var applies=t.animalId?t.animalId===a.id:(t.target==='All'||t.target===a.species);
+    if(!applies)return;
     var until=addDays(t.date,t.withdrawal);
     if(until>date){var p=prod(t.productId);out.push((p?p.name:'Treatment')+' (withdrawal until '+dshort(until)+')')}
   });
   return out;
+}
+
+/* family helpers */
+function relatedMsg(m,f){
+  if(!m||!f)return '';
+  var mp=[m.motherId,m.fatherId].filter(Boolean), fp=[f.motherId,f.fatherId].filter(Boolean);
+  if(mp.indexOf(f.id)>=0||fp.indexOf(m.id)>=0)return 'One of these two is the parent of the other.';
+  for(var i=0;i<mp.length;i++){if(fp.indexOf(mp[i])>=0)return 'These two share a parent, so they are brother and sister.'}
+  return '';
+}
+function isDescendant(p,a){
+  var seen={},stack=[p];
+  while(stack.length){
+    var x=stack.pop();if(!x||seen[x.id])continue;seen[x.id]=1;
+    var par=[aById(x.motherId),aById(x.fatherId)];
+    for(var i=0;i<par.length;i++){if(par[i]){if(par[i].id===a.id)return true;stack.push(par[i])}}
+  }
+  return false;
+}
+function parentChoices(species,sex,selfAnimal,sel){
+  var l=db.animals.filter(function(a){return isInd(a)&&a.species===species&&a.sex===sex&&(!selfAnimal||(a.id!==selfAnimal.id&&!isDescendant(a,selfAnimal)))});
+  l.sort(function(x,y){return ((x.status==='active')?0:1)-((y.status==='active')?0:1)||String(x.tag).localeCompare(String(y.tag))});
+  return '<option value="">Not recorded</option>'+l.map(function(a){return '<option value="'+a.id+'"'+(a.id===sel?' selected':'')+'>'+esc(a.tag)+(a.status!=='active'?' ('+a.status+')':'')+'</option>'}).join('');
+}
+function syncParents(form){
+  if(!form||!form.elements.mother)return;
+  var sp=form.elements.species.value, self=form.dataset.self?aById(form.dataset.self):null;
+  var m=form.elements.mother.value, f=form.elements.father.value;
+  form.elements.mother.innerHTML=parentChoices(sp,'Female',self,m);
+  form.elements.father.innerHTML=parentChoices(sp,'Male',self,f);
+  var box=form.querySelector('.relwarn');
+  if(box){var msg=relatedMsg(aById(form.elements.mother.value),aById(form.elements.father.value));box.hidden=!msg;box.textContent=msg?msg+' Breeding close relatives can weaken the young.':''}
+}
+
+/* repeating costs */
+function occ(r,k){
+  if(r.freq==='weekly')return addDays(r.start,7*k);
+  if(r.freq==='fortnightly')return addDays(r.start,14*k);
+  var a=r.start.split('-'),y=+a[0],m=+a[1]-1+k;
+  y+=Math.floor(m/12);m=((m%12)+12)%12;
+  return ymd(y,m+1,Math.min(r.dom||+a[2],dim(y,m+1)));
+}
+function nextOcc(r){for(var k=0;k<3000;k++){var d=occ(r,k);if(!r.lastGen||d>r.lastGen)return d}return r.start}
+function skipToNow(r){var t=today(),last=null;for(var k=0;k<3000;k++){var d=occ(r,k);if(d>t)break;last=d}if(last&&(!r.lastGen||last>r.lastGen))r.lastGen=last}
+function runRecurring(){
+  var n=0,t=today();
+  db.recurring.forEach(function(r){
+    if(!r.active)return;
+    for(var k=0;k<3000;k++){
+      var d=occ(r,k);if(d>t)break;
+      if(r.lastGen&&d<=r.lastGen)continue;
+      var dup=db.tx.some(function(x){return x.recId===r.id&&x.date===d});
+      r.lastGen=d;
+      if(dup)continue;
+      db.tx.push({id:uid(),date:d,dir:'out',cat:r.cat,amount:r.amount,item:r.item,supplier:r.supplier||'',note:'',recId:r.id});n++;
+    }
+  });
+  if(n)save();
+  return n;
+}
+
+/* treatments */
+function linkLegacy(t){
+  if(t.txId||!t.cost)return;
+  var pn=(prod(t.productId)||{}).name;
+  var m=db.tx.find(function(y){return y.dir==='out'&&y.cat==='Health'&&y.amount===t.cost&&y.date===t.date&&y.item===pn});
+  if(m)t.txId=m.id;
+}
+function syncTreatCost(t,cost,name){
+  var x=t.txId?db.tx.find(function(y){return y.id===t.txId}):null;
+  if(cost>0){
+    if(x){x.amount=cost;x.date=t.date;x.item=name}
+    else if(cost!==(t.cost||0)||!t.cost){var id=uid();db.tx.push({id:id,date:t.date,dir:'out',cat:'Health',amount:cost,item:name,supplier:'',note:''});t.txId=id}
+  }else if(x){db.tx=db.tx.filter(function(y){return y!==x});t.txId=''}
+  t.cost=cost;
+}
+function recalcSchedule(pid,target){
+  var s=db.schedules.find(function(x){return x.productId===pid&&x.target===target});if(!s)return;
+  var ds=db.treatments.filter(function(t){return t.productId===pid&&t.target===target&&!t.animalId}).map(function(t){return t.date}).sort();
+  if(ds.length){s.last=ds[ds.length-1];s.next=addDays(s.last,s.interval)}
 }
 
 /* ---------- icons ---------- */
@@ -211,6 +342,7 @@ var TABS=[['home','Home','home'],['animals','Animals','paw'],['health','Health',
 
 /* ---------- views ---------- */
 function list(rows,emptyMsg){return rows.length?'<div class="list">'+rows.join('')+'</div>':'<div class="empty">'+emptyMsg+'</div>'}
+function moveRow(e){return '<div class="item"><div class="main"><div class="t">'+EVT[e.type]+' · '+e.qty+' '+esc(e.species)+'</div><div class="s">'+dshort(e.date)+(e.who?' · '+esc(e.who):'')+(e.note?' · '+esc(e.note):'')+'</div></div>'+(e.price?'<span class="num">'+money(e.price)+'</span>':'')+'</div>'}
 
 function vHome(){
   var h='';
@@ -221,12 +353,12 @@ function vHome(){
     list(due.map(function(s){var p=prod(s.productId);return '<button class="item" data-a="logsched" data-id="'+s.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">Due '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div>'+pillFor(sdays(s))+'</button>'}),'Nothing due in the next 14 days.')+'</div>';
   var tm=totals('month'),net=tm.tin-tm.tout;
   var fi=feedInfo();
-  h+='<div class="card"><div class="sec"><h2>This month</h2><button class="btn sm" data-a="tab" data-v="money">Details</button></div>'+
+  h+='<div class="card"><div class="sec"><h2>This month</h2><span style="display:flex;gap:6px"><button class="btn sm" data-a="open" data-k="cal">Calendar</button><button class="btn sm" data-a="tab" data-v="money">Details</button></span></div>'+
     '<div class="grid"><div class="tile"><b class="num">'+money(tm.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(tm.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div>';
   if(fi.last){var ago=diff(fi.last.date,today());h+='<div class="small muted">Last feed bought '+ago+' day'+(ago===1?'':'s')+' ago'+(fi.avg?'. You usually buy about every '+Math.round(fi.avg)+' days.':'.')+'</div>'}
   h+='</div>';
   var rec=db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,4);
-  h+='<div class="card"><h2>Recent movements</h2>'+list(rec.map(function(e){return '<div class="item"><div class="main"><div class="t">'+EVT[e.type]+' · '+e.qty+' '+esc(e.species)+'</div><div class="s">'+dshort(e.date)+(e.who?' · '+esc(e.who):'')+'</div></div>'+(e.price?'<span class="num">'+money(e.price)+'</span>':'')+'</div>'}),'No animals added, sold or born yet.')+'</div>';
+  h+='<div class="card"><h2>Recent movements</h2>'+list(rec.map(moveRow),'No animals added, sold or born yet.')+'</div>';
   h+='<div class="row"><button class="btn pri" data-a="open" data-k="event" style="flex:1">Animal event</button><button class="btn pri" data-a="open" data-k="treat" style="flex:1">Log treatment</button><button class="btn pri" data-a="open" data-k="tx" style="flex:1">Add expense</button></div>';
   return h;
 }
@@ -236,12 +368,14 @@ function vAnimals(){
   h+='<div class="chips">'+['All'].concat(SPECIES.slice(0,4)).map(function(s){return '<button class="chip" aria-pressed="'+(flt===s)+'" data-a="filter" data-v="'+s+'">'+s+(s==='All'?'':' '+count(s))+'</button>'}).join('')+'</div>';
   var rows=db.animals.filter(function(a){return (flt==='All'||a.species===flt)&&(showPast||a.status==='active')});
   h+='<div class="card">'+list(rows.map(function(a){
-    var meta=[a.species,a.sex&&a.sex!=='Mixed'?a.sex:'',ageStr(a.birth),a.source==='born'?'born here':'bought'].filter(Boolean).join(' · ');
-    return '<button class="item" data-a="animal" data-id="'+a.id+'"><div class="main"><div class="t">'+esc(aLabel(a))+'</div><div class="s">'+esc(meta)+'</div></div>'+(a.status==='active'?'<b class="num">'+a.qty+'</b>':'<span class="pill">'+a.status+'</span>')+'</button>';
-  }),'No animals here yet. Add some with an Event (Bought or Born).')+
+    var ind=isInd(a), sx=ind?(a.sex!=='Unknown'?a.sex:''):(a.sex!=='Mixed'?a.sex:'');
+    var meta=[a.species,sx,ageStr(a.birth),SRC[a.source]||''].filter(Boolean).join(' · ');
+    var par=ind?parentsLine(a):'';
+    return '<button class="item" data-a="animal" data-id="'+a.id+'"><div class="main"><div class="t">'+esc(aLabel(a))+'</div><div class="s">'+esc(meta)+'</div>'+(par?'<div class="s">'+esc(par)+'</div>':'')+'</div>'+(a.status!=='active'?'<span class="pill">'+a.status+'</span>':(ind?'':'<b class="num">'+a.qty+'</b>'))+'</button>';
+  }),'No animals here yet. Add some with an Event (Bought, Born or Already on the farm).')+
   '<button class="btn sm" data-a="past" style="align-self:flex-start">'+(showPast?'Hide':'Show')+' sold, eaten and dead</button></div>';
   var ev=db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,12);
-  h+='<div class="card"><h2>Movements</h2>'+list(ev.map(function(e){return '<div class="item"><div class="main"><div class="t">'+EVT[e.type]+' · '+e.qty+' '+esc(e.species)+'</div><div class="s">'+dshort(e.date)+(e.who?' · '+esc(e.who):'')+(e.note?' · '+esc(e.note):'')+'</div></div>'+(e.price?'<span class="num">'+money(e.price)+'</span>':'')+'</div>'}),'No movements yet.')+'</div>';
+  h+='<div class="card"><h2>Movements</h2>'+list(ev.map(moveRow),'No movements yet.')+'</div>';
   return h;
 }
 
@@ -249,22 +383,24 @@ function vHealth(){
   var h='<div class="row"><h2>Health</h2><div class="row"><button class="btn" data-a="open" data-k="sched">+ Schedule</button><button class="btn pri" data-a="open" data-k="treat">+ Log</button></div></div>';
   h+='<div class="card"><h2>Schedules</h2>'+list(sortedSched().map(function(s){
     var p=prod(s.productId);
-    return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+(p?esc(p.type):'')+' · every '+s.interval+' d · '+(s.last?'last '+dshort(s.last):'not done yet')+' · next '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'+pillFor(sdays(s))+'<span><button class="btn sm pri" data-a="logsched" data-id="'+s.id+'">Done</button> <button class="btn sm" data-a="del" data-c="schedules" data-id="'+s.id+'">Edit</button></span></div></div>';
+    return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+(p?esc(p.type):'')+' · every '+s.interval+' d · '+(s.last?'last '+dshort(s.last):'not done yet')+' · next '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'+pillFor(sdays(s))+'<span><button class="btn sm pri" data-a="logsched" data-id="'+s.id+'">Done</button> <button class="btn sm" data-a="schededit" data-id="'+s.id+'">Edit</button></span></div></div>';
   }),'No schedules. Add one for each vaccine, dewormer or dip.')+'</div>';
   var hist=db.treatments.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,15);
   h+='<div class="card"><h2>History</h2>'+list(hist.map(function(t){var p=prod(t.productId);
-    return '<button class="item" data-a="del" data-c="treatments" data-id="'+t.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(t.target)+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+(t.note?' · '+esc(t.note):'')+'</div></div>'+(t.cost?'<span class="num">'+money(t.cost)+'</span>':'')+'</button>'}),'Nothing logged yet.')+'</div>';
+    return '<button class="item" data-a="treatedit" data-id="'+t.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(tLabel(t))+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+(t.note?' · '+esc(t.note):'')+'</div></div>'+(t.cost?'<span class="num">'+money(t.cost)+'</span>':'')+'</button>'}),'Nothing logged yet.')+'</div>';
   return h;
 }
 
 function vMoney(){
   var labels={month:'This month',last:'Last month',year:'This year',all:'All time'};
   var T=totals(period),net=T.tin-T.tout;
-  var h='<div class="row"><h2>Money</h2><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div>';
+  var h='<div class="row"><h2>Money</h2><div class="row"><button class="btn" data-a="open" data-k="cal">Calendar</button><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div></div>';
   h+='<div class="chips">'+Object.keys(labels).map(function(k){return '<button class="chip" aria-pressed="'+(period===k)+'" data-a="period" data-v="'+k+'">'+labels[k]+'</button>'}).join('')+'</div>';
   var cats=Object.keys(T.out).sort(function(a,b){return T.out[b]-T.out[a]}),mx=cats.length?T.out[cats[0]]:1;
   h+='<div class="card"><div class="grid"><div class="tile"><b class="num">'+money(T.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(T.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div>'+
    (cats.length?'<h3>Where it went</h3>'+cats.map(function(c){return '<div class="bar"><span>'+c+'</span><div class="track"><i style="width:'+Math.max(2,Math.round(T.out[c]/mx*100))+'%"></i></div><span class="num">'+money(T.out[c])+'</span></div>'}).join(''):'<div class="empty">No spending in this period.</div>')+'</div>';
+  h+='<div class="card"><div class="sec"><h2>Repeating costs</h2><button class="btn sm" data-a="txrepeat">+ Add</button></div>'+
+   list(db.recurring.map(function(r){return '<button class="item" data-a="rec" data-id="'+r.id+'"><div class="main"><div class="t">'+esc(r.item||r.cat)+'</div><div class="s">'+esc(r.cat)+' · '+FREQ[r.freq].toLowerCase()+' · '+(r.active?'next '+dshort(nextOcc(r)):'paused')+'</div></div><b class="num">'+money(r.amount)+'</b></button>'}),'Nothing repeats yet. When you add a cost, choose how often it repeats and it is added for you each time.')+'</div>';
   var fi=feedInfo();
   h+='<div class="card"><h2>Feed rhythm</h2>'+(fi.avg?'<div class="small muted">Average gap between feed purchases: '+Math.round(fi.avg)+' days. Next one expected around '+dshort(addDays(fi.last.date,Math.round(fi.avg)))+'.</div>':'<div class="small muted">Log at least two feed purchases to see your rhythm.</div>')+
    list(fi.rows.slice().reverse().slice(0,8).map(function(r){
@@ -272,7 +408,7 @@ function vMoney(){
      return '<div class="item"><div class="main"><div class="t">'+esc(r.x.item||'Feed')+' · '+money(r.x.amount)+'</div><div class="s">'+dshort(r.x.date)+(r.gap!==null?' · '+r.gap+' d after the one before':'')+'</div></div>'+pl+'</div>'}),'No feed purchases yet.')+'</div>';
   var tx=db.tx.slice().sort(function(a,b){return a.date<b.date?1:-1}).filter(function(x){return inPeriod(x.date,period)}).slice(0,30);
   h+='<div class="card"><h2>Transactions</h2>'+list(tx.map(function(x){
-    return '<button class="item" data-a="del" data-c="tx" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+x.cat+(x.supplier?' · '+esc(x.supplier):'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
+    return '<button class="item" data-a="txedit" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+esc(x.cat)+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
   return h;
 }
 
@@ -303,7 +439,7 @@ function doImport(v){
   try{
     var o=JSON.parse(String(v).trim());
     if(!o||!Array.isArray(o.animals)||!Array.isArray(o.tx))throw 0;
-    o.example=false;o.created=o.created||today();o.lastBackup=today();
+    o=fix(o);o.example=false;o.lastBackup=today();
     db=o;save();render();toast('Restored '+db.animals.length+' animal records and '+db.tx.length+' transactions.');
   }catch(e){toast('That does not look like a Farm Book backup.')}
 }
@@ -351,86 +487,189 @@ function render(){
 /* ---------- forms ---------- */
 function opts(arr,sel){return arr.map(function(x){var v=Array.isArray(x)?x[0]:x,l=Array.isArray(x)?x[1]:x;return '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(l)+'</option>'}).join('')}
 function fld(l,inner,note){return '<label class="f">'+l+(note?' <small>'+note+'</small>':'')+inner+'</label>'}
-var targets=function(sel){return opts(['All'].concat(SPECIES),sel)};
 function head(t){return '<div class="row"><h2>'+t+'</h2><button class="btn sm" type="button" data-a="close">Close</button></div>'}
+function hid(id){return id?'<input type="hidden" name="_id" value="'+esc(id)+'">':''}
+function rmBlock(coll,id,label){
+  return '<div class="rm"><button type="button" class="btn bad" data-a="rmask">Remove '+label+'</button><div class="row" hidden><button type="button" class="btn bad" data-a="rmgo" data-c="'+coll+'" data-id="'+id+'" style="flex:1">Yes, remove</button><button type="button" class="btn" data-a="rmno" style="flex:1">Keep it</button></div></div>';
+}
+function targetOpts(sel,selAnimalId){
+  var an=db.animals.filter(function(a){return a.status==='active'||a.id===selAnimalId});
+  var g=an.length?'<optgroup label="A specific animal or group">'+an.map(function(a){var v='an:'+a.id;return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+esc(aLabel(a))+' · '+a.species+'</option>'}).join('')+'</optgroup>':'';
+  return opts(['All'].concat(SPECIES),sel)+g;
+}
+function plist(){return '<datalist id="plist">'+db.products.map(function(x){return '<option value="'+esc(x.name)+'">'}).join('')+'</datalist>'}
 
 function fTreat(pre){
-  var s=pre.sched?db.schedules.find(function(x){return x.id===pre.sched}):null, p=s?prod(s.productId):null;
-  return head('Log treatment')+'<form data-form="treat">'+
-   fld('Date','<input type="date" name="date" value="'+today()+'" required>')+
-   fld('Product','<input name="product" list="plist" required placeholder="e.g. Ivermectin" value="'+esc(p?p.name:'')+'">')+
-   '<datalist id="plist">'+db.products.map(function(x){return '<option value="'+esc(x.name)+'">'}).join('')+'</datalist>'+
-   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('Given to','<select name="target">'+targets(s?s.target:'All')+'</select>')+'</div>'+
-   '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head" value="'+esc(s?s.dose:'')+'">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" value="'+(p?p.withdrawal:'')+'">','before slaughter or sale')+'</div>'+
-   fld('Cost','<input name="cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">','optional, counts as Health spending')+
-   fld('Notes','<input name="note" placeholder="Optional">')+
-   '<button class="btn pri" type="submit">Save treatment</button></form>';
+  var t=pre.tid?db.treatments.find(function(x){return x.id===pre.tid}):null;
+  if(pre.tid&&!t)return '';
+  var s=pre.sched?db.schedules.find(function(x){return x.id===pre.sched}):null;
+  var p=t?prod(t.productId):(s?prod(s.productId):null);
+  var sel=t?(t.animalId?'an:'+t.animalId:t.target):s?s.target:pre.animalId?'an:'+pre.animalId:'All';
+  var selA=t?t.animalId:pre.animalId;
+  return head(t?'Edit treatment':'Log treatment')+'<form data-form="treat">'+hid(t&&t.id)+
+   fld('Date','<input type="date" name="date" value="'+(t?t.date:today())+'" required>')+
+   fld('Product','<input name="product" list="plist" required placeholder="e.g. Ivermectin" value="'+esc(p?p.name:'')+'">')+plist()+
+   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('Given to','<select name="target">'+targetOpts(sel,selA)+'</select>')+'</div>'+
+   '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head" value="'+esc(t?t.dose:(s?s.dose:''))+'">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" value="'+(t?(t.withdrawal||0):(p?p.withdrawal:''))+'">','before slaughter or sale')+'</div>'+
+   fld('Cost','<input name="cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="'+(t&&t.cost?t.cost:'')+'">','optional, counts as Health spending')+
+   fld('Notes','<input name="note" placeholder="Optional" value="'+esc(t?t.note:'')+'">')+
+   '<button class="btn pri" type="submit">'+(t?'Save changes':'Save treatment')+'</button></form>'+(t?rmBlock('treatments',t.id,'this treatment'):'');
 }
-function fSched(){
-  return head('New schedule')+'<form data-form="sched">'+
-   fld('Product','<input name="product" list="plist" required placeholder="e.g. Tick dip">')+
-   '<datalist id="plist">'+db.products.map(function(x){return '<option value="'+esc(x.name)+'">'}).join('')+'</datalist>'+
-   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,'Vaccine')+'</select>')+fld('For','<select name="target">'+targets('All')+'</select>')+'</div>'+
-   '<div class="two">'+fld('Repeat every (days)','<input name="interval" type="number" min="1" inputmode="numeric" required placeholder="14">')+fld('Next due','<input name="next" type="date" value="'+today()+'" required>')+'</div>'+
-   '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" placeholder="0">')+'</div>'+
-   '<button class="btn pri" type="submit">Save schedule</button></form>';
+function fSched(pre){
+  var s=pre.id?db.schedules.find(function(x){return x.id===pre.id}):null;
+  if(pre.id&&!s)return '';
+  var p=s?prod(s.productId):null;
+  return head(s?'Edit schedule':'New schedule')+'<form data-form="sched">'+hid(s&&s.id)+
+   fld('Product','<input name="product" list="plist" required placeholder="e.g. Tick dip" value="'+esc(p?p.name:'')+'">')+plist()+
+   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('For','<select name="target">'+opts(['All'].concat(SPECIES),s?s.target:'All')+'</select>')+'</div>'+
+   '<div class="two">'+fld('Repeat every (days)','<input name="interval" type="number" min="1" inputmode="numeric" required placeholder="14" value="'+(s?s.interval:'')+'">')+fld('Next due','<input name="next" type="date" value="'+(s?s.next:today())+'" required>')+'</div>'+
+   '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head" value="'+esc(s?s.dose:'')+'">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" placeholder="0" value="'+(p?p.withdrawal:'')+'">')+'</div>'+
+   '<button class="btn pri" type="submit">'+(s?'Save changes':'Save schedule')+'</button></form>'+(s?rmBlock('schedules',s.id,'this schedule'):'');
 }
 function fEvent(){
   var act=active();
+  var animalOpts=act.length?act.map(function(a){return '<option value="'+a.id+'">'+esc(aLabel(a))+' · '+a.species+(isInd(a)?'':' ('+a.qty+')')+'</option>'}).join(''):'<option value="">No animals recorded</option>';
   return head('Animal event')+'<form data-form="event" id="evForm">'+
    '<div class="two">'+fld('What happened','<select name="type">'+opts(Object.keys(EVT).map(function(k){return [k,EVT[k]]}),'bought')+'</select>')+fld('Date','<input type="date" name="date" value="'+today()+'" required>')+'</div>'+
-   '<div data-for="bought born">'+'<div class="two">'+fld('Species','<select name="species">'+opts(SPECIES,'Goats')+'</select>')+fld('Tag or group name','<input name="tag" placeholder="e.g. Kids Oct">','optional')+'</div>'+
-     '<div class="two" style="margin-top:12px">'+fld('Sex','<select name="sex">'+opts(['Mixed','Female','Male'],'Mixed')+'</select>')+fld('How many','<input name="qtyNew" type="number" min="1" inputmode="numeric" value="1">')+'</div></div>'+
-   '<div data-for="sold eaten died" hidden>'+fld('Which animals','<select name="animalId">'+(act.length?act.map(function(a){return '<option value="'+a.id+'">'+esc(aLabel(a))+' · '+a.species+' ('+a.qty+')</option>'}).join(''):'<option value="">No animals recorded</option>')+'</select>')+
-     fld('How many','<input name="qtyOut" type="number" min="1" inputmode="numeric" value="1">')+'</div>'+
-   '<div data-for="bought sold">'+'<div class="two">'+fld('Total price','<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">')+fld('<span id="whoL">Seller</span>','<input name="who">')+'</div></div>'+
+   '<div data-for="bought born existing"><div class="two">'+fld('Species','<select name="species">'+opts(SPECIES,'Goats')+'</select>')+fld('Record as','<select name="kind"><option value="individual">One animal</option><option value="group">A group</option></select>')+'</div></div>'+
+   '<div data-for="bought born existing" data-kind="individual" class="stack">'+
+     fld('Tag number','<input name="tags" placeholder="e.g. 4567" autocomplete="off">','several of the same sex? separate with commas')+
+     '<div class="two">'+fld('Sex','<select name="sexI">'+opts(['Female','Male','Unknown'],'Female')+'</select>')+'<div data-for="bought existing">'+fld('Birth date','<input type="date" name="birthI">','if known')+'</div></div>'+
+     '<div data-for="born existing" class="stack"><div class="two">'+fld('Mother','<select name="mother"></select>')+fld('Father','<select name="father"></select>')+'</div><div class="warnbox relwarn" hidden></div></div>'+
+   '</div>'+
+   '<div data-for="bought born existing" data-kind="group" class="stack" hidden><div class="two">'+fld('Group name','<input name="tagG" placeholder="e.g. Kids Oct">','optional')+fld('Sex','<select name="sexG">'+opts(['Mixed','Female','Male'],'Mixed')+'</select>')+'</div>'+fld('How many','<input name="qtyNew" type="number" min="1" inputmode="numeric" value="1">')+'</div>'+
+   '<div data-for="sold eaten died" class="stack" hidden>'+fld('Which animal','<select name="animalId">'+animalOpts+'</select>')+'<div id="qtyOutWrap">'+fld('How many','<input name="qtyOut" type="number" min="1" inputmode="numeric" value="1">')+'</div></div>'+
+   '<div data-for="bought sold"><div class="two">'+fld('Total price','<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">')+fld('<span id="whoL">Seller</span>','<input name="who">')+'</div></div>'+
    '<div id="wd" class="warnbox" hidden></div>'+
    fld('Notes','<input name="note" placeholder="Optional">')+
    '<button class="btn pri" type="submit">Save</button></form>';
 }
 function syncEvent(){
   var f=document.getElementById('evForm');if(!f)return;
-  var t=f.elements.type.value;
-  f.querySelectorAll('[data-for]').forEach(function(el){el.hidden=el.getAttribute('data-for').split(' ').indexOf(t)<0});
+  var t=f.elements.type.value, kind=f.elements.kind.value;
+  f.querySelectorAll('[data-for]').forEach(function(el){
+    var ok=el.getAttribute('data-for').split(' ').indexOf(t)>=0;
+    var k=el.getAttribute('data-kind');if(k&&ok)ok=(k===kind);
+    el.hidden=!ok;
+  });
   var w=document.getElementById('whoL');if(w)w.textContent=t==='sold'?'Buyer':'Seller';
+  syncParents(f);
   var box=document.getElementById('wd');box.hidden=true;
-  if(t==='sold'||t==='eaten'){
-    var a=db.animals.find(function(x){return x.id===f.elements.animalId.value});
-    if(a){var m=withdrawalWarn(a.species,f.elements.date.value||today());if(m.length){box.hidden=false;box.textContent='Withdrawal period still running: '+m.join(', ')+'. Check before you slaughter or sell.'}}
+  var sa=aById(f.elements.animalId.value);
+  var qo=document.getElementById('qtyOutWrap');if(qo)qo.hidden=!!(sa&&isInd(sa));
+  if((t==='sold'||t==='eaten')&&sa){
+    var m=withdrawalWarn(sa,f.elements.date.value||today());
+    if(m.length){box.hidden=false;box.textContent='Withdrawal period still running: '+m.join(', ')+'. Check before you slaughter or sell.'}
   }
 }
-function fTx(){
-  return head('Add money in or out')+'<form data-form="tx" id="txForm">'+
-   '<div class="two">'+fld('Type','<select name="dir"><option value="out">Spent</option><option value="in">Received</option></select>')+fld('Date','<input type="date" name="date" value="'+today()+'" required>')+'</div>'+
-   '<div class="two">'+fld('Category','<select name="cat">'+opts(OUTCATS,'Feed')+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required>')+'</div>'+
-   fld('What for','<input name="item" placeholder="e.g. Lucerne bales, 20 bags">')+
-   fld('Supplier or buyer','<input name="supplier" placeholder="Optional">')+
-   '<button class="btn pri" type="submit">Save</button></form>';
+function fTx(pre){
+  var x=pre.id?db.tx.find(function(r){return r.id===pre.id}):null;
+  if(pre.id&&!x)return '';
+  var dir=x?x.dir:'out', rep=pre.repeat||'none';
+  return head(x?'Edit entry':'Add money in or out')+'<form data-form="tx" id="txForm">'+hid(x&&x.id)+
+   '<div class="two">'+fld('Type','<select name="dir"><option value="out"'+(dir==='out'?' selected':'')+'>Spent</option><option value="in"'+(dir==='in'?' selected':'')+'>Received</option></select>')+fld('Date','<input type="date" name="date" value="'+(x?x.date:(pre.date||today()))+'" required>')+'</div>'+
+   '<div class="two">'+fld('Category','<select name="cat">'+opts(dir==='in'?INCATS:OUTCATS,x?x.cat:(dir==='in'?'Sales':(pre.repeat?'Labour':'Feed')))+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+(x?x.amount:'')+'">')+'</div>'+
+   fld('What for','<input name="item" placeholder="e.g. Lucerne bales, 20 bags" value="'+esc(x?x.item:'')+'">')+
+   fld('Supplier or buyer','<input name="supplier" placeholder="Optional" value="'+esc(x?x.supplier:'')+'">')+
+   (x?(x.recId?'<div class="small muted">This entry was added by a repeating cost. Changing it here changes only this entry.</div>':''):
+     '<div class="stack" id="repWrap"'+(dir==='in'?' hidden':'')+'>'+fld('Repeat','<select name="repeat"><option value="none"'+(rep==='none'?' selected':'')+'>Does not repeat</option>'+Object.keys(FREQ).map(function(k){return '<option value="'+k+'"'+(rep===k?' selected':'')+'>'+FREQ[k]+'</option>'}).join('')+'</select>')+
+     '<div class="small muted" id="repHint"'+(rep==='none'?' hidden':'')+'>It starts on the date above and is added for you every time it comes round. Dates in the past are added straight away.</div></div>')+
+   '<button class="btn pri" type="submit">'+(x?'Save changes':'Save')+'</button></form>'+(x?rmBlock('tx',x.id,'this entry'):'');
 }
+function fRec(pre){
+  var r=db.recurring.find(function(x){return x.id===pre.id});if(!r)return '';
+  return head('Repeating cost')+'<form data-form="rec">'+hid(r.id)+
+   fld('What for','<input name="item" value="'+esc(r.item)+'" placeholder="e.g. Farm hand wages">')+
+   '<div class="two">'+fld('Category','<select name="cat">'+opts(OUTCATS,r.cat)+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+r.amount+'">')+'</div>'+
+   fld('Supplier or person','<input name="supplier" value="'+esc(r.supplier)+'" placeholder="Optional">')+
+   '<div class="two">'+fld('How often','<select name="freq">'+opts(Object.keys(FREQ).map(function(k){return [k,FREQ[k]]}),r.freq)+'</select>')+fld('Next payment','<input type="date" name="next" value="'+nextOcc(r)+'" required>')+'</div>'+
+   fld('Status','<select name="active">'+opts([['yes','Active'],['no','Paused']],r.active?'yes':'no')+'</select>')+
+   '<div class="small muted">Changes apply from the next payment. Entries already added stay as they are.</div>'+
+   '<button class="btn pri" type="submit">Save changes</button></form>'+rmBlock('recurring',r.id,'this repeating cost');
+}
+function famRow(label,p){return '<div class="row"><span class="muted">'+label+'</span>'+(p?'<button class="chip" data-a="animal" data-id="'+p.id+'">'+esc(p.tag)+'</button>':'<span class="muted">Not recorded</span>')+'</div>'}
 function fAnimal(pre){
-  var a=db.animals.find(function(x){return x.id===pre.id});if(!a)return '';
-  var tr=db.treatments.filter(function(t){return t.target==='All'||t.target===a.species}).sort(function(x,y){return x.date<y.date?1:-1}).slice(0,6);
-  return head(esc(aLabel(a)))+'<div class="small muted">'+esc(a.species)+' · '+a.qty+' head · '+(a.source==='born'?'born here':'bought')+(a.birth?' · '+ageStr(a.birth):'')+' · '+a.status+'</div>'+
-   '<h3>Recent treatments for '+esc(a.species)+'</h3>'+list(tr.map(function(t){var p=prod(t.productId);return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+'</div></div></div>'}),'None logged.')+
-   '<div class="row"><button class="btn" data-a="open" data-k="treat" style="flex:1">Log treatment</button>'+
-   (confirmKey==='an'+a.id?'<button class="btn bad" data-a="delanimal" data-id="'+a.id+'" style="flex:1">Confirm remove</button>':'<button class="btn" data-a="askdel" data-key="an'+a.id+'" data-k="animal" data-id="'+a.id+'" style="flex:1">Remove record</button>')+'</div>';
+  var a=aById(pre.id);if(!a)return '';
+  var ind=isInd(a);
+  var tr=db.treatments.filter(function(t){return t.animalId?t.animalId===a.id:(t.target==='All'||t.target===a.species)}).sort(function(x,y){return x.date<y.date?1:-1}).slice(0,6);
+  var kids=db.animals.filter(function(k){return k.motherId===a.id||k.fatherId===a.id});
+  var meta=[esc(a.species),ind?(a.sex!=='Unknown'?a.sex:''):a.qty+' head',SRC[a.source]||'',a.birth?ageStr(a.birth)+' old':'',a.status].filter(Boolean).join(' · ');
+  var h=head(esc(aLabel(a)))+'<div class="small muted">'+meta+'</div>';
+  if(ind){
+    h+='<h3>Family</h3><div class="stack">'+famRow('Mother',aById(a.motherId))+famRow('Father',aById(a.fatherId))+
+      '<div class="row" style="align-items:flex-start"><span class="muted">Offspring ('+kids.length+')</span>'+(kids.length?'<div class="chips" style="justify-content:flex-end">'+kids.map(function(k){return '<button class="chip" data-a="animal" data-id="'+k.id+'">'+esc(aLabel(k))+'</button>'}).join('')+'</div>':'<span class="muted">None recorded</span>')+'</div></div>';
+  }
+  h+='<h3>Recent treatments</h3>'+list(tr.map(function(t){var p=prod(t.productId);return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+'</div></div></div>'}),'None logged.')+
+   '<div class="row"><button class="btn" data-a="animaledit" data-id="'+a.id+'" style="flex:1">Edit</button><button class="btn" data-a="treatfor" data-id="'+a.id+'" style="flex:1">Log treatment</button></div>'+
+   rmBlock('animals',a.id,'record');
+  return h;
 }
-function fDel(pre){
-  var coll=db[pre.c],x=coll.find(function(r){return r.id===pre.id});if(!x)return '';
-  var title=pre.c==='tx'?(x.item||x.cat)+' · '+money(x.amount):pre.c==='treatments'?((prod(x.productId)||{}).name||'Treatment')+' · '+x.target:((prod(x.productId)||{}).name||'Schedule')+' · '+x.target;
-  return head(pre.c==='schedules'?'Stop this schedule?':'Remove this entry?')+'<div class="item" style="border:0"><div class="main"><div class="t">'+esc(title)+'</div><div class="s">'+(x.date?dshort(x.date):'Every '+x.interval+' days')+'</div></div></div>'+
-   (confirmKey==='d'+x.id?'<button class="btn bad" data-a="delrow" data-c="'+pre.c+'" data-id="'+x.id+'">Yes, remove</button>':'<button class="btn bad" data-a="askdel" data-key="d'+x.id+'" data-k="del" data-c="'+pre.c+'" data-id="'+x.id+'">Remove</button>');
+function fAnimalEdit(pre){
+  var a=aById(pre.id);if(!a)return '';
+  var ind=isInd(a);
+  return head('Edit '+esc(aLabel(a)))+'<form data-form="animalEdit" id="aeForm" data-self="'+a.id+'">'+hid(a.id)+
+   fld(ind?'Tag number':'Group name','<input name="tag" value="'+esc(a.tag)+'" autocomplete="off">')+
+   '<div class="two">'+fld('Species','<select name="species">'+opts(SPECIES,a.species)+'</select>')+fld('Sex','<select name="sex">'+opts(ind?['Female','Male','Unknown']:['Mixed','Female','Male'],a.sex)+'</select>')+'</div>'+
+   (ind?fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional'):'<div class="two">'+fld('How many','<input name="qty" type="number" min="1" inputmode="numeric" value="'+a.qty+'">')+fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional')+'</div>')+
+   (ind?'<div class="two">'+fld('Mother','<select name="mother">'+parentChoices(a.species,'Female',a,a.motherId)+'</select>')+fld('Father','<select name="father">'+parentChoices(a.species,'Male',a,a.fatherId)+'</select>')+'</div><div class="warnbox relwarn" hidden></div>':'')+
+   fld('Status','<select name="status">'+opts([['active','On the farm'],['sold','Sold'],['eaten','Eaten at home'],['died','Died']],a.status)+'</select>','to record a sale with money, use Animal event')+
+   '<button class="btn pri" type="submit">Save changes</button></form>';
 }
+
+/* calendar */
+function dayStats(ym){
+  var m={};
+  db.tx.forEach(function(x){if(x.date.slice(0,7)!==ym)return;var s=m[x.date]||(m[x.date]={'in':0,out:0,items:[]});if(x.dir==='in')s['in']+=x.amount;else s.out+=x.amount;s.items.push(x)});
+  return m;
+}
+function dueMap(ym){
+  var m={},end=ym+'-31';
+  db.schedules.forEach(function(s){
+    if(!s.interval||s.interval<1)return;
+    var d=s.next;
+    for(var k=0;k<400&&d<=end;k++){if(d.slice(0,7)===ym)(m[d]||(m[d]=[])).push(s);d=addDays(d,s.interval)}
+  });
+  return m;
+}
+function calBody(){
+  var ym=calMonth, y=+ym.slice(0,4), mo=+ym.slice(5,7), st=dayStats(ym), due=dueMap(ym), t=today();
+  var tin=0,tout=0;Object.keys(st).forEach(function(k){tin+=st[k]['in'];tout+=st[k].out});
+  var net=tin-tout, first=(new Date(y,mo-1,1).getDay()+6)%7, n=dim(y,mo), cells='';
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(w){cells+='<span class="wd">'+w+'</span>'});
+  for(var i=0;i<first;i++)cells+='<span></span>';
+  for(var d=1;d<=n;d++){
+    var ds=ymd(y,mo,d), s=st[ds], dn=s?s['in']-s.out:0;
+    cells+='<button class="day'+(ds===t?' today':'')+(ds===calDay?' sel':'')+'" data-a="calday" data-d="'+ds+'" aria-label="'+dlong(ds)+(s?', net '+money(dn):'')+'">'+
+      '<span class="dn">'+d+'</span>'+(s?'<span class="da '+(dn<0?'neg':dn>0?'pos':'')+'">'+(dn<0?'-':dn>0?'+':'')+cmp(dn)+'</span>':'')+(due[ds]?'<i class="dot"></i>':'')+'</button>';
+  }
+  var h='<div class="monthbar"><button class="btn sm" data-a="calprev" aria-label="Previous month">&lsaquo;</button><b>'+new Date(y,mo-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'})+'</b><button class="btn sm" data-a="calnext" aria-label="Next month">&rsaquo;</button></div>'+
+    '<div class="sum3"><div class="tile"><b class="num">'+money(tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div>'+
+    '<div class="cal">'+cells+'</div><div class="small muted">Each day shows money in minus money out. A dot marks a treatment that is due.</div>';
+  if(!calDay||calDay.slice(0,7)!==ym){h+='<div class="empty">Tap a day to see what was spent or sold.</div>'}
+  else{
+    var sd=st[calDay], dl=due[calDay]||[], nd=sd?sd['in']-sd.out:0;
+    h+='<div class="stack"><div class="sec"><h3>'+dlong(calDay)+'</h3>'+(sd?'<b class="num" style="color:var(--'+(nd<0?'bad':'good')+')">'+(nd>0?'+':'')+money(nd)+'</b>':'')+'</div>';
+    if(sd)h+=list(sd.items.map(function(x){return '<div class="item"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+esc(x.cat)+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></div>'}),'');
+    else h+='<div class="empty">Nothing recorded on this day.</div>';
+    dl.forEach(function(s){var p=prod(s.productId);h+='<div class="item"><div class="main"><div class="t">Due: '+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+esc(s.dose||'')+'</div></div><span class="pill warn">Health</span></div>'});
+    h+='<button class="btn sm" data-a="caladd" style="align-self:flex-start">Add an entry on this day</button></div>';
+  }
+  return h;
+}
+function fCal(){return head('Calendar')+'<div class="stack" id="calBody">'+calBody()+'</div>'}
+function renderCal(){var el=document.getElementById('calBody');if(el)el.innerHTML=calBody()}
+function shiftMonth(n){var y=+calMonth.slice(0,4),m=+calMonth.slice(5,7)-1+n;y+=Math.floor(m/12);m=((m%12)+12)%12;calMonth=y+'-'+p2(m+1);calDay=''}
 
 function openSheet(kind,pre){
   cur={kind:kind,pre:pre||{}};
-  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,del:fDel}[kind](cur.pre);
+  if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
+  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal}[kind](cur.pre);
+  if(!html){cur=null;return}
   var host=document.getElementById('sheetHost');
   host.innerHTML='<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
   if(kind==='event')syncEvent();
 }
 function closeSheet(){cur=null;confirmKey=null;document.getElementById('sheetHost').innerHTML=''}
-function reopen(){if(cur)openSheet(cur.kind,cur.pre)}
 
 /* ---------- saving ---------- */
 function findProduct(name,type,wd){
@@ -439,35 +678,120 @@ function findProduct(name,type,wd){
   else{p.type=type;if(wd!==null)p.withdrawal=wd}
   return p;
 }
+function removeRow(c,id){
+  if(c==='treatments'){
+    var t=db.treatments.find(function(x){return x.id===id});
+    if(t){linkLegacy(t);if(t.txId)db.tx=db.tx.filter(function(x){return x.id!==t.txId});db.treatments=db.treatments.filter(function(x){return x.id!==id});recalcSchedule(t.productId,t.target)}
+    return;
+  }
+  if(c==='tx'){db.tx=db.tx.filter(function(x){return x.id!==id});db.treatments.forEach(function(t){if(t.txId===id){t.txId='';t.cost=0}});return}
+  if(c==='animals'){db.animals=db.animals.filter(function(x){return x.id!==id});db.animals.forEach(function(a){if(a.motherId===id)a.motherId='';if(a.fatherId===id)a.fatherId=''});return}
+  db[c]=db[c].filter(function(x){return x.id!==id});
+}
 var forms={
  treat:function(f){
+  var name=f.product.trim();if(!name)return E('Enter the product name.');
   var wdv=f.withdrawal===''?null:Math.max(0,+f.withdrawal||0);
-  var p=findProduct(f.product.trim(),f.type,wdv), cost=+f.cost||0;
-  db.treatments.push({id:uid(),date:f.date,productId:p.id,target:f.target,dose:f.dose.trim(),cost:cost,note:f.note.trim(),withdrawal:p.withdrawal});
-  if(cost>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Health',amount:cost,item:p.name,supplier:'',note:''});
-  var s=db.schedules.find(function(x){return x.productId===p.id&&x.target===f.target});
-  if(s){s.last=f.date;s.next=addDays(f.date,s.interval);if(f.dose.trim())s.dose=f.dose.trim()}
+  var animalId='',target=f.target;
+  if(target.indexOf('an:')===0){animalId=target.slice(3);var an=aById(animalId);target=an?an.species:'All'}
+  var p=findProduct(name,f.type,wdv), cost=+f.cost||0, wd=wdv===null?p.withdrawal:wdv;
+  if(f._id){
+    var t=db.treatments.find(function(x){return x.id===f._id});if(!t)return E('That entry no longer exists.');
+    linkLegacy(t);
+    var oldP=t.productId,oldT=t.target;
+    t.date=f.date;t.productId=p.id;t.target=target;t.animalId=animalId;t.dose=f.dose.trim();t.note=f.note.trim();t.withdrawal=wd;
+    syncTreatCost(t,cost,p.name);
+    recalcSchedule(oldP,oldT);recalcSchedule(p.id,target);
+    return;
+  }
+  var nt={id:uid(),date:f.date,productId:p.id,target:target,animalId:animalId,dose:f.dose.trim(),cost:0,note:f.note.trim(),withdrawal:wd,txId:''};
+  db.treatments.push(nt);
+  syncTreatCost(nt,cost,p.name);
+  if(!animalId){
+    var s=db.schedules.find(function(x){return x.productId===p.id&&x.target===target});
+    if(s){s.last=f.date;s.next=addDays(f.date,s.interval);if(f.dose.trim())s.dose=f.dose.trim()}
+  }
  },
  sched:function(f){
-  var p=findProduct(f.product.trim(),f.type,f.withdrawal===''?null:Math.max(0,+f.withdrawal||0));
+  if(!(+f.interval>=1))return E('Enter how many days between treatments.');
+  var name=f.product.trim();if(!name)return E('Enter the product name.');
+  var p=findProduct(name,f.type,f.withdrawal===''?null:Math.max(0,+f.withdrawal||0));
+  if(f._id){
+    var s0=db.schedules.find(function(x){return x.id===f._id});if(!s0)return E('That schedule no longer exists.');
+    s0.productId=p.id;s0.target=f.target;s0.interval=+f.interval;s0.next=f.next;s0.dose=f.dose.trim();
+    return;
+  }
   var s=db.schedules.find(function(x){return x.productId===p.id&&x.target===f.target});
   if(s){s.interval=+f.interval;s.next=f.next;s.dose=f.dose.trim()}
   else db.schedules.push({id:uid(),productId:p.id,target:f.target,interval:+f.interval,dose:f.dose.trim(),last:null,next:f.next});
  },
- tx:function(f){db.tx.push({id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:+f.amount||0,item:f.item.trim(),supplier:f.supplier.trim(),note:''})},
+ tx:function(f){
+  var amt=+f.amount;if(!(amt>0))return E('Enter an amount above 0.');
+  if(f._id){
+    var x=db.tx.find(function(r){return r.id===f._id});if(!x)return E('That entry no longer exists.');
+    x.date=f.date;x.dir=f.dir;x.cat=f.cat;x.amount=amt;x.item=f.item.trim();x.supplier=f.supplier.trim();
+    db.treatments.forEach(function(t){if(t.txId===x.id)t.cost=amt});
+    return;
+  }
+  if(f.dir==='out'&&f.repeat&&f.repeat!=='none'){
+    db.recurring.push({id:uid(),dir:'out',cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),freq:f.repeat,start:f.date,dom:+f.date.slice(8),lastGen:null,active:true});
+    runRecurring();
+    return {msg:'Repeating cost saved: '+FREQ[f.repeat].toLowerCase()+', from '+dshort(f.date)+'.'};
+  }
+  db.tx.push({id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),note:''});
+ },
+ rec:function(f){
+  var r=db.recurring.find(function(x){return x.id===f._id});if(!r)return E('That repeating cost no longer exists.');
+  var amt=+f.amount;if(!(amt>0))return E('Enter an amount above 0.');
+  r.item=f.item.trim();r.cat=f.cat;r.amount=amt;r.supplier=f.supplier.trim();
+  var cur0=nextOcc(r),was=r.active;
+  r.active=f.active==='yes';
+  if(f.next!==cur0||f.freq!==r.freq){r.freq=f.freq;r.start=f.next;r.dom=+f.next.slice(8);r.lastGen=null}
+  else if(r.active&&!was)skipToNow(r);
+  runRecurring();
+ },
+ animalEdit:function(f){
+  var a=aById(f._id);if(!a)return E('That animal no longer exists.');
+  var ind=isInd(a),tag=f.tag.trim();
+  if(ind&&!tag)return E('A tag number is needed.');
+  if(tag&&tagTaken(tag,a.id))return E('The tag '+tag+' is already used by another animal.');
+  a.tag=tag;a.species=f.species;a.sex=f.sex;a.birth=f.birth||'';a.status=f.status;
+  if(ind){
+    a.motherId=f.mother||'';a.fatherId=f.father||'';
+    var mo=aById(a.motherId),fa=aById(a.fatherId);
+    if(mo&&mo.species!==a.species)a.motherId='';
+    if(fa&&fa.species!==a.species)a.fatherId='';
+  }else a.qty=Math.max(1,parseInt(f.qty,10)||1);
+ },
  event:function(f){
   var t=f.type,price=+f.price||0;
-  if(t==='bought'||t==='born'){
-    var q=Math.max(1,parseInt(f.qtyNew,10)||1);
-    db.animals.push({id:uid(),tag:f.tag.trim(),species:f.species,sex:f.sex,qty:q,source:t,birth:t==='born'?f.date:'',status:'active'});
-    db.stock.push({id:uid(),date:f.date,type:t,species:f.species,qty:q,who:f.who||'',price:t==='bought'?price:0,note:f.note.trim()});
-    if(t==='bought'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+f.species.toLowerCase(),supplier:f.who||'',note:''});
+  if(t==='bought'||t==='born'||t==='existing'){
+    var sp=f.species,q,note=f.note.trim();
+    if(f.kind==='individual'){
+      var tags=String(f.tags||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
+      if(!tags.length)return E('Enter a tag number for the animal.');
+      var seen={};
+      for(var i=0;i<tags.length;i++){
+        var k=tags[i].toLowerCase();
+        if(seen[k])return E('The tag '+tags[i]+' is used twice.');
+        seen[k]=1;
+        if(tagTaken(tags[i]))return E('The tag '+tags[i]+' is already used by another animal.');
+      }
+      var withParents=(t==='born'||t==='existing');
+      tags.forEach(function(tg){db.animals.push({id:uid(),tag:tg,species:sp,sex:f.sexI,qty:1,source:t,birth:t==='born'?f.date:(f.birthI||''),status:'active',kind:'individual',motherId:withParents?(f.mother||''):'',fatherId:withParents?(f.father||''):''})});
+      q=tags.length;if(!note)note=tags.join(', ');
+    }else{
+      q=Math.max(1,parseInt(f.qtyNew,10)||1);
+      db.animals.push({id:uid(),tag:f.tagG.trim(),species:sp,sex:f.sexG,qty:q,source:t,birth:t==='born'?f.date:'',status:'active',kind:'group',motherId:'',fatherId:''});
+    }
+    db.stock.push({id:uid(),date:f.date,type:t,species:sp,qty:q,who:t==='bought'?(f.who||''):'',price:t==='bought'?price:0,note:note});
+    if(t==='bought'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+sp.toLowerCase(),supplier:f.who||'',note:''});
   }else{
-    var a=db.animals.find(function(x){return x.id===f.animalId});if(!a)return;
-    var q2=Math.max(1,Math.min(a.qty,parseInt(f.qtyOut,10)||1));
+    var a=aById(f.animalId);if(!a)return E('Choose an animal first.');
+    var q2=isInd(a)?1:Math.max(1,Math.min(a.qty,parseInt(f.qtyOut,10)||1));
     a.qty-=q2;if(a.qty<=0){a.qty=q2;a.status=t}
-    db.stock.push({id:uid(),date:f.date,type:t,species:a.species,qty:q2,who:f.who||'',price:t==='sold'?price:0,note:f.note.trim()});
-    if(t==='sold'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'in',cat:'Sales',amount:price,item:q2+' '+a.species.toLowerCase()+' sold',supplier:f.who||'',note:''});
+    db.stock.push({id:uid(),date:f.date,type:t,species:a.species,qty:q2,who:f.who||'',price:t==='sold'?price:0,note:f.note.trim()||(isInd(a)?a.tag:'')});
+    if(t==='sold'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'in',cat:'Sales',amount:price,item:(isInd(a)?a.tag:q2+' '+a.species.toLowerCase())+' sold',supplier:f.who||'',note:''});
   }
  }
 };
@@ -483,10 +807,20 @@ var actions={
  past:function(){showPast=!showPast;render()},
  period:function(d){period=d.v;render()},
  animal:function(d){openSheet('animal',{id:d.id})},
- del:function(d){openSheet('del',{c:d.c,id:d.id})},
- askdel:function(d){confirmKey=d.key;openSheet(d.k,d.k==='del'?{c:d.c,id:d.id}:{id:d.id})},
- delrow:function(d){db[d.c]=db[d.c].filter(function(r){return r.id!==d.id});confirmKey=null;save();closeSheet();render()},
- delanimal:function(d){db.animals=db.animals.filter(function(r){return r.id!==d.id});confirmKey=null;save();closeSheet();render()},
+ animaledit:function(d){openSheet('animalEdit',{id:d.id})},
+ treatfor:function(d){openSheet('treat',{animalId:d.id})},
+ treatedit:function(d){openSheet('treat',{tid:d.id})},
+ schededit:function(d){openSheet('sched',{id:d.id})},
+ txedit:function(d){openSheet('tx',{id:d.id})},
+ txrepeat:function(){openSheet('tx',{repeat:'monthly'})},
+ rec:function(d){openSheet('rec',{id:d.id})},
+ calprev:function(){shiftMonth(-1);renderCal()},
+ calnext:function(){shiftMonth(1);renderCal()},
+ calday:function(d){calDay=d.d;renderCal()},
+ caladd:function(){openSheet('tx',{date:calDay})},
+ rmask:function(d,el){el.hidden=true;el.nextElementSibling.hidden=false},
+ rmno:function(d,el){var row=el.closest('.row');row.hidden=true;row.previousElementSibling.hidden=false},
+ rmgo:function(d){removeRow(d.c,d.id);save();closeSheet();render();toast(d.c==='recurring'?'Removed. Entries already added stay.':'Removed.')},
  scrim:function(d,el,e){if(e.target===el)closeSheet()},
  wipe1:function(){confirmKey='wipe';render()},
  cancelc:function(){confirmKey=null;render()},
@@ -518,15 +852,34 @@ document.addEventListener('click',function(e){
 document.addEventListener('submit',function(e){
   var form=e.target.closest('form[data-form]');if(!form)return;
   e.preventDefault();
-  forms[form.dataset.form](fd(form));
+  var r=forms[form.dataset.form](fd(form));
+  if(r&&r.err){toast(r.err);return}
   save();closeSheet();render();
+  if(r&&r.msg)toast(r.msg);
 });
 document.addEventListener('change',function(e){
-  if(e.target.id==='impFile'&&e.target.files&&e.target.files[0]){var r=new FileReader();r.onload=function(){doImport(r.result)};r.onerror=function(){toast('Could not read that file.')};r.readAsText(e.target.files[0]);return}
-  if(e.target.closest('#evForm'))syncEvent();
-  if(e.target.form&&e.target.form.id==='txForm'&&e.target.name==='dir'){var c=e.target.form.elements.cat;c.innerHTML=opts(e.target.value==='in'?INCATS:OUTCATS,e.target.value==='in'?'Sales':'Feed')}});
+  var el=e.target;
+  if(el.id==='impFile'&&el.files&&el.files[0]){var r=new FileReader();r.onload=function(){doImport(r.result)};r.onerror=function(){toast('Could not read that file.')};r.readAsText(el.files[0]);return}
+  var form=el.form;if(!form)return;
+  if(form.id==='evForm'){
+    if(el.name==='species')form.elements.kind.value=el.value==='Chickens'?'group':'individual';
+    syncEvent();
+  }
+  if(form.id==='aeForm'&&/^(species|mother|father)$/.test(el.name))syncParents(form);
+  if(form.id==='txForm'){
+    if(el.name==='dir'){
+      form.elements.cat.innerHTML=opts(el.value==='in'?INCATS:OUTCATS,el.value==='in'?'Sales':'Feed');
+      var rw=document.getElementById('repWrap');if(rw)rw.hidden=(el.value==='in');
+    }
+    if(el.name==='repeat'){var hn=document.getElementById('repHint');if(hn)hn.hidden=(el.value==='none')}
+  }
+});
+function notifyRecurring(n){if(n&&!db.example){render();toast('Added '+n+' repeating cost'+(n>1?'s':'')+' to Money.')}}
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&db){var n=runRecurring();if(n){if(db.example)render();else notifyRecurring(n)}}});
 
-db=load();render();
+db=load();
+notifyRecurring(runRecurring());
+render();
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 try{if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
 })();
