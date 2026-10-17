@@ -188,6 +188,23 @@ table.t tr.clk:hover{background:var(--soft)}
   .pie .donut{width:190px;max-width:190px;flex:none;align-self:center}
   .pie .legend{flex:1;min-width:0}
 }
+
+#printRoot{display:none}
+@media print{
+  @page{margin:14mm}
+  body>*:not(#printRoot){display:none!important}
+  body{background:#fff!important;padding:0!important;color:#000}
+  #printRoot{display:block!important;color:#000;background:#fff;font:11pt/1.4 'Source Sans 3',system-ui,sans-serif}
+  #printRoot h1{font:700 20pt var(--display);margin:0 0 2pt}
+  #printRoot h2{font:700 13pt var(--display);margin:16pt 0 6pt;break-after:avoid}
+  #printRoot .pm{margin:0 0 8pt;color:#444}
+  #printRoot table.pt{width:100%;border-collapse:collapse;font-size:10pt}
+  #printRoot .pt th,#printRoot .pt td{border-bottom:.5pt solid #bbb;padding:3pt 5pt;text-align:left}
+  #printRoot .pt th{border-bottom:1pt solid #000;font-weight:700}
+  #printRoot .pt .r{text-align:right;font-variant-numeric:tabular-nums}
+  #printRoot .pt tr{break-inside:avoid}
+  #printRoot .pt tfoot td{font-weight:700;border-top:1pt solid #000}
+}
 </style>
 </head>
 <body>
@@ -1018,10 +1035,539 @@ function icsText(){
     'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Back up Farm Book','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
 }
 
+/* ---------- spreadsheet files (built in, no outside library) ---------- */
+var CRCT=null;
+function crc32(b){
+  if(!CRCT){CRCT=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);CRCT[n]=c>>>0}}
+  var c2=-1;for(var i=0;i<b.length;i++)c2=CRCT[(c2^b[i])&255]^(c2>>>8);return (c2^-1)>>>0;
+}
+function u8(s){return new TextEncoder().encode(s)}
+function zipStore(files,mime){
+  var parts=[],cen=[],off=0;
+  files.forEach(function(f){
+    var nm=u8(f.name),crc=crc32(f.data),sz=f.data.length;
+    var h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(h.buffer),nm,f.data);
+    var c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,nm.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nm);
+    off+=30+nm.length+sz;
+  });
+  var csz=0;cen.forEach(function(p){csz+=p.length});
+  var e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csz,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:mime});
+}
+function colName(i){var s='';i++;while(i>0){var m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s}
+function xe(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'')}
+function dateSerial(s){var a=s.split('-');return Math.round(Date.UTC(+a[0],+a[1]-1,+a[2])/86400000)+25569}
+/* a cell is a string, a number, or {d:'YYYY-MM-DD'} for a real date */
+function sheetXml(rows,widths){
+  var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+  if(widths)x+='<cols>'+widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'}).join('')+'</cols>';
+  x+='<sheetData>';
+  rows.forEach(function(r,ri){
+    x+='<row r="'+(ri+1)+'">';
+    r.forEach(function(v,ci){
+      if(v===''||v==null)return;
+      var ref=colName(ci)+(ri+1);
+      if(typeof v==='number'&&isFinite(v))x+='<c r="'+ref+'" s="3"><v>'+v+'</v></c>';
+      else if(typeof v==='object'&&v.d)x+='<c r="'+ref+'" s="2"><v>'+dateSerial(v.d)+'</v></c>';
+      else x+='<c r="'+ref+'" t="inlineStr"'+(ri===0?' s="1"':'')+'><is><t xml:space="preserve">'+xe(v)+'</t></is></c>';
+    });
+    x+='</row>';
+  });
+  return x+'</sheetData></worksheet>';
+}
+function xlsxBlob(sheets){
+  var files=[],names=[],NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+  sheets.forEach(function(s,i){
+    var nm=String(s.name).replace(/[\[\]:*?\/\\]/g,' ').slice(0,31),n=nm,k=2;
+    while(names.indexOf(n)>=0)n=nm.slice(0,28)+' '+(k++);
+    names.push(n);
+    files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:u8(sheetXml(s.rows,s.widths))});
+  });
+  var H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  files.unshift(
+    {name:'[Content_Types].xml',data:u8(H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map(function(s,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'}).join('')+'</Types>')},
+    {name:'_rels/.rels',data:u8(H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},
+    {name:'xl/workbook.xml',data:u8(H+'<workbook '+NS+' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map(function(n,i){return '<sheet name="'+xe(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'}).join('')+'</sheets></workbook>')},
+    {name:'xl/_rels/workbook.xml.rels',data:u8(H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')},
+    {name:'xl/styles.xml',data:u8(H+'<styleSheet '+NS+'><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs></styleSheet>')}
+  );
+  return zipStore(files,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+function inflateRaw(u){
+  var ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();
+  w.write(u);w.close();
+  return new Response(ds.readable).arrayBuffer().then(function(b){return new Uint8Array(b)});
+}
+function unzipText(buf){
+  var u=new Uint8Array(buf),dv=new DataView(buf),i=u.length-22;
+  while(i>=0&&dv.getUint32(i,true)!==0x06054b50)i--;
+  if(i<0)return Promise.reject(new Error('zip'));
+  var n=dv.getUint16(i+10,true),p=dv.getUint32(i+16,true),jobs=[],out={};
+  for(var k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50)return Promise.reject(new Error('zip'));
+    var meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    var name=new TextDecoder().decode(u.subarray(p+46,p+46+nl));
+    var ds0=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),data=u.subarray(ds0,ds0+csz);
+    if(/^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^\/]+\.xml)$/.test(name)){
+      (function(name,meth,data){
+        jobs.push((meth===0?Promise.resolve(data):meth===8?inflateRaw(data):Promise.reject(new Error('zip'))).then(function(d){out[name]=new TextDecoder().decode(d)}));
+      })(name,meth,data);
+    }
+    p+=46+nl+el+cl;
+  }
+  return Promise.all(jobs).then(function(){return out});
+}
+function colIndex(ref){var m=/^([A-Z]+)/.exec(ref||'');if(!m)return 0;var n=0;for(var i=0;i<m[1].length;i++)n=n*26+m[1].charCodeAt(i)-64;return n-1}
+function parseSheetXml(doc,ss){
+  var rows=[];
+  [].forEach.call(doc.getElementsByTagName('row'),function(r,ri){
+    var idx=(+r.getAttribute('r')||ri+1)-1,arr=[];
+    [].forEach.call(r.getElementsByTagName('c'),function(c,ci){
+      var col=c.getAttribute('r')?colIndex(c.getAttribute('r')):ci,t=c.getAttribute('t'),vEl=c.getElementsByTagName('v')[0],v=vEl?vEl.textContent:'',val='';
+      if(t==='s')val=ss[+v]||'';
+      else if(t==='inlineStr')val=[].map.call(c.getElementsByTagName('t'),function(x){return x.textContent}).join('');
+      else if(t==='str')val=v;
+      else if(t==='b')val=v==='1'?'TRUE':'FALSE';
+      else if(t==='e')val='';
+      else if(v!==''&&!isNaN(+v))val=+v;
+      else val=v;
+      arr[col]=val;
+    });
+    for(var q=0;q<arr.length;q++)if(arr[q]===undefined)arr[q]='';
+    while(rows.length<idx)rows.push([]);
+    rows[idx]=arr;
+  });
+  return rows;
+}
+function parseXlsx(buf){
+  return unzipText(buf).then(function(z){
+    if(!z['xl/workbook.xml'])throw new Error('zip');
+    function xml(s){return new DOMParser().parseFromString(s,'application/xml')}
+    var wb=xml(z['xl/workbook.xml']),rm={},ss=[];
+    if(z['xl/_rels/workbook.xml.rels'])[].forEach.call(xml(z['xl/_rels/workbook.xml.rels']).getElementsByTagName('Relationship'),function(r){rm[r.getAttribute('Id')]=r.getAttribute('Target')});
+    if(z['xl/sharedStrings.xml'])[].forEach.call(xml(z['xl/sharedStrings.xml']).getElementsByTagName('si'),function(si){
+      ss.push([].filter.call(si.getElementsByTagName('t'),function(t){return t.parentNode.nodeName!=='rPh'}).map(function(t){return t.textContent}).join(''));
+    });
+    var out=[],ri=0;
+    [].forEach.call(wb.getElementsByTagName('sheet'),function(s){
+      ri++;
+      var rid=s.getAttribute('r:id')||s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id'),t=rm[rid]||('worksheets/sheet'+ri+'.xml');
+      var path=t.charAt(0)==='/'?t.slice(1):'xl/'+t;
+      if(!z[path])return;
+      out.push({name:s.getAttribute('name')||('Sheet '+ri),rows:parseSheetXml(xml(z[path]),ss)});
+    });
+    return out;
+  });
+}
+function parseCsv(text){
+  text=String(text).replace(/^﻿/,'');
+  var line=text.split(/\r?\n/)[0]||'',best=',',bc=-1;
+  [',',';','\t'].forEach(function(d){var c=line.split(d).length;if(c>bc){bc=c;best=d}});
+  var rows=[],row=[],cell='',q=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text.charAt(i);
+    if(q){if(ch==='"'){if(text.charAt(i+1)==='"'){cell+='"';i++}else q=false}else cell+=ch}
+    else if(ch==='"'&&cell==='')q=true;
+    else if(ch===best){row.push(cell);cell=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text.charAt(i+1)==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}
+    else cell+=ch;
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row)}
+  return rows;
+}
+function downloadBlob(name,blob){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},10000)}
+function deliverFile(name,blob,done){
+  var f=null;try{f=new File([blob],name,{type:blob.type})}catch(e){}
+  if(f&&navigator.canShare&&navigator.canShare({files:[f]})&&/Android|iPhone|iPad/i.test(navigator.userAgent)){
+    navigator.share({files:[f],title:name}).then(function(){done&&done('shared')},function(err){if(err&&err.name==='AbortError')return;try{downloadBlob(name,blob);done&&done('saved')}catch(e){toast('Could not save the file.')}});
+    return;
+  }
+  try{downloadBlob(name,blob);done&&done('saved')}catch(e){toast('Could not save the file.')}
+}
+
+/* ---------- export to Excel ---------- */
+function excelBlob(){
+  var D=function(s){return s?{d:s}:''};
+  var an=[['Tag or group','Type','Sex','Count','Birth date','Age','Source','Mother','Father','Status']].concat(db.animals.map(function(a){
+    var m=aById(a.motherId),f=aById(a.fatherId);
+    return [a.tag||'',a.species,a.sex,a.qty,D(a.birth),ageStr(a.birth),SRC[a.source]||'',m?m.tag:'',f?f.tag:'',a.status==='active'?'On the farm':a.status];
+  }));
+  var tx=[['Date','In or out','Category','What for','Animal type','Animals (tags)','Supplier or buyer','Amount (P)','Repeating']].concat(db.tx.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).map(function(x){
+    var tags=(x.animalIds||[]).map(function(id){var a=aById(id);return a?a.tag:''}).filter(Boolean).join(', ');
+    return [D(x.date),x.dir==='in'?'In':'Out',x.cat,x.item||'',x.species||'',tags,x.supplier||'',x.amount,x.recId?'Yes':''];
+  }));
+  var pd=profitData('all',false),pr=[['Animal type','Income (P)','Costs (P)','Profit (P)']];
+  pd.rows.forEach(function(r){pr.push([r.sp,r.inc,r.cost,r.profit])});
+  if(pd.shared>0)pr.push(['Shared farm costs',0,pd.shared,-pd.shared]);
+  if(pd.unspec>0)pr.push(['Income not tied to a type',pd.unspec,0,pd.unspec]);
+  pr.push(['Total',pd.tin,pd.tout,pd.tin-pd.tout]);
+  var tr=[['Date','Product','Kind','Given to','Dose','Cost (P)','Note']].concat(db.treatments.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(t){var p=prod(t.productId);return [D(t.date),p?p.name:'',p?p.type:'',tLabel(t),t.dose||'',t.cost||'',t.note||'']}));
+  var sc=[['Product','Kind','For','Every (days)','Last done','Next due','Dose']].concat(db.schedules.map(function(s){var p=prod(s.productId);return [p?p.name:'',p?p.type:'',s.target,s.interval,D(s.last),D(s.next),s.dose||'']}));
+  var mv=[['Date','Event','Type','Number','Who','Price (P)','Note']].concat(db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(e){return [D(e.date),EVT[e.type]||e.type,e.species,e.qty,e.who||'',e.price||'',e.note||'']}));
+  return xlsxBlob([
+    {name:'Animals',rows:an,widths:[18,11,9,8,12,10,12,12,12,12]},
+    {name:'Money',rows:tx,widths:[12,9,12,28,12,22,20,12,10]},
+    {name:'Profit per type',rows:pr,widths:[26,13,13,13]},
+    {name:'Treatments',rows:tr,widths:[12,22,12,16,16,10,26]},
+    {name:'Schedules',rows:sc,widths:[22,12,16,12,12,12,16]},
+    {name:'Movements',rows:mv,widths:[12,20,10,8,16,10,28]}
+  ]);
+}
+function exportExcel(){
+  try{deliverFile('farm-book-'+today()+'.xlsx',excelBlob(),function(h){toast(h==='shared'?'Spreadsheet shared.':'Spreadsheet saved. Open it in Excel or Google Sheets.')})}
+  catch(e){toast('Could not make the spreadsheet on this device.')}
+}
+
+/* ---------- PDF report (the print screen has Save as PDF) ---------- */
+var repPer='month';
+function reportHtml(per){
+  var T=totals(per),pd=profitData(per,false),txs=periodTx(per).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+  function tbl(head,rows,foot){return '<table class="pt"><thead><tr>'+head.map(function(h,i){return '<th'+(i>0&&h.r?' class="r"':'')+'>'+esc(h.t||h)+'</th>'}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody>'+(foot||'')+'</table>'}
+  var R=function(t){return {t:t,r:true}};
+  var h='<h1>Farm Book report</h1><p class="pm">'+(db.example?'Example records. ':'')+PERIODS[per]+' · made '+dshort(today())+'</p>';
+  h+='<h2>Summary</h2>'+tbl(['',R('Amount')],[
+    '<tr><td>Money in</td><td class="r">'+money(T.tin)+'</td></tr>','<tr><td>Money spent</td><td class="r">'+money(T.tout)+'</td></tr>','<tr><td><b>Net</b></td><td class="r"><b>'+money(T.tin-T.tout)+'</b></td></tr>']);
+  h+='<h2>Profit per animal type</h2>';
+  var pr=pd.rows.map(function(r){return '<tr><td>'+esc(r.sp)+'</td><td class="r">'+money(r.inc)+'</td><td class="r">'+money(r.cost)+'</td><td class="r">'+money(r.profit)+'</td></tr>'});
+  if(pd.shared>0)pr.push('<tr><td>Shared farm costs</td><td class="r">'+money(0)+'</td><td class="r">'+money(pd.shared)+'</td><td class="r">'+money(-pd.shared)+'</td></tr>');
+  if(pd.unspec>0)pr.push('<tr><td>Income not tied to a type</td><td class="r">'+money(pd.unspec)+'</td><td class="r">'+money(0)+'</td><td class="r">'+money(pd.unspec)+'</td></tr>');
+  h+=pr.length?tbl(['Type',R('Income'),R('Costs'),R('Profit')],pr):'<p>Nothing recorded in this period.</p>';
+  var cats=OUTCATS.filter(function(c){return T.out[c]>0}).sort(function(a,b){return T.out[b]-T.out[a]});
+  h+='<h2>Spending by category</h2>'+(cats.length?tbl(['Category',R('Amount'),R('Share')],cats.map(function(c){return '<tr><td>'+esc(c)+'</td><td class="r">'+money(T.out[c])+'</td><td class="r">'+pct(T.out[c]/T.tout)+'</td></tr>'})):'<p>No spending in this period.</p>');
+  h+='<h2>Animals on the farm now</h2>'+tbl(['Type',R('Number')],SPECIES.filter(function(s){return count(s)>0}).map(function(s){return '<tr><td>'+esc(s)+'</td><td class="r">'+count(s)+'</td></tr>'}),'<tfoot><tr><td>Total</td><td class="r">'+count()+'</td></tr></tfoot>');
+  var act=db.animals.filter(function(a){return a.status==='active'}).sort(function(a,b){return a.species<b.species?-1:a.species>b.species?1:aLabel(a)<aLabel(b)?-1:1});
+  if(act.length)h+='<h2>Animal list</h2>'+tbl(['Tag or group','Type','Sex','Age',R('Count')],act.map(function(a){return '<tr><td>'+esc(aLabel(a))+'</td><td>'+esc(a.species)+'</td><td>'+esc(a.sex==='Unknown'?'':a.sex)+'</td><td>'+esc(ageStr(a.birth))+'</td><td class="r">'+a.qty+'</td></tr>'}));
+  h+='<h2>Money in and out</h2>'+(txs.length?tbl(['Date','What for','Category','Type',R('Amount')],txs.slice(0,400).map(function(x){return '<tr><td>'+dshort(x.date)+'</td><td>'+esc(x.item||x.cat)+'</td><td>'+esc(x.cat)+'</td><td>'+esc(x.species||'')+'</td><td class="r">'+(x.dir==='in'?'+':'-')+money(x.amount).slice(2)+'</td></tr>'}))+(txs.length>400?'<p>Showing the first 400 of '+txs.length+' entries.</p>':''):'<p>Nothing recorded in this period.</p>');
+  return h;
+}
+function printReport(per){
+  var old=document.getElementById('printRoot');if(old)old.remove();
+  var d=document.createElement('div');d.id='printRoot';d.innerHTML=reportHtml(per);document.body.appendChild(d);
+  var clean=function(){var x=document.getElementById('printRoot');if(x)x.remove();window.removeEventListener('afterprint',clean)};
+  window.addEventListener('afterprint',clean);
+  setTimeout(function(){try{window.print()}catch(e){clean();toast('Printing is not available here.')}},60);
+}
+
+/* ---------- import from Excel or CSV ---------- */
+var imp=null;
+var IMPF={
+ animals:[
+  ['tag','Tag or ear number',['tag','eartag','tagno','tagnumber','earno','earnumber','id','animalid','number','no','name']],
+  ['species','Type of animal',['species','type','kind','animaltype','animal','class','livestock']],
+  ['sex','Sex',['sex','gender','mf']],
+  ['birth','Birth date',['dateofbirth','birthdate','dob','birth','born','birthday']],
+  ['mother','Mother',['mother','dam','mum','mom']],
+  ['father','Father',['father','sire','dad']],
+  ['count','Number of animals',['count','qty','quantity','numberofanimals','noofanimals','head','total']]
+ ],
+ money:[
+  ['date','Date',['date','day','when']],
+  ['amount','Amount',['amount','value','price','pula','bwp','total','p']],
+  ['kind','In or out',['inout','inorout','direction','transactiontype','incomeexpense','type']],
+  ['mIn','Money in',['moneyin','income','received','credit','revenue','in','sales']],
+  ['mOut','Money out',['moneyout','expense','expenses','spent','debit','out','payment','cost']],
+  ['cat','Category',['category','cat','account','group']],
+  ['item','What it was for',['description','item','details','whatfor','for','narration','particulars','note','notes']],
+  ['species','Animal type',['animaltype','species','animal','livestock']],
+  ['supplier','Supplier or buyer',['supplier','buyer','customer','vendor','paidto','who','from','to']]
+ ]
+};
+function normH(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'')}
+function impTable(){
+  var sh=imp.sheets[imp.si];if(!sh)return {heads:[],data:[]};
+  var rows=sh.rows.filter(function(r){return r&&r.some(function(c){return String(c).trim()!==''})}),w=0;
+  rows.forEach(function(r){if(r.length>w)w=r.length});
+  var heads=[],data=imp.hdr?rows.slice(1):rows,hr=imp.hdr?rows[0]||[]:[];
+  for(var i=0;i<w;i++){var t=String(hr[i]==null?'':hr[i]).trim();heads.push(t||('Column '+colName(i)))}
+  return {heads:heads,data:data};
+}
+function impGuess(){
+  var t=impTable(),defs=IMPF[imp.kind],map={},used={};
+  function pass(contains){
+    defs.forEach(function(d){
+      if(map[d[0]]!==undefined)return;
+      for(var i=0;i<t.heads.length;i++){
+        if(used[i])continue;
+        var h=normH(t.heads[i]);if(!h)continue;
+        var hit=d[2].some(function(s){return contains?(s.length>=4&&h.indexOf(s)>=0):h===s});
+        if(hit){map[d[0]]=i;used[i]=1;break}
+      }
+    });
+  }
+  pass(false);pass(true);
+  defs.forEach(function(d){if(map[d[0]]===undefined)map[d[0]]=''});
+  imp.map=map;
+  if(imp.kind==='money')imp.mode=(map.mIn!==''&&map.mOut!=='')?'split':(map.kind!==''?'kind':'sign');
+}
+function cellOf(r,i){if(i===''||i==null)return '';var v=r[i];return v==null?'':String(v).trim()}
+function numOf(v){
+  if(typeof v==='number')return v;
+  var s=String(v==null?'':v).trim();if(!s)return NaN;
+  var neg=/^\(.*\)$/.test(s)||/^-/.test(s)||/-$/.test(s);
+  s=s.replace(/[^0-9.,]/g,'');if(!s)return NaN;
+  if(s.indexOf(',')>=0&&s.indexOf('.')>=0)s=s.replace(/,/g,'');
+  else if(s.indexOf(',')>=0){s=/,\d{1,2}$/.test(s)?s.replace(',','.'):s.replace(/,/g,'')}
+  var n=parseFloat(s);if(isNaN(n))return NaN;
+  return neg?-Math.abs(n):n;
+}
+var MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function isoOf(y,m,d){
+  y=+y;m=+m;d=+d;if(y<100)y+=(y<=((new Date().getFullYear()%100)+1)?2000:1900);
+  var dt=new Date(Date.UTC(y,m-1,d));
+  if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return '';
+  return y+'-'+p2(m)+'-'+p2(d);
+}
+function dateOf(v){
+  if(v===''||v==null)return '';
+  if(typeof v==='number'){if(v>20000&&v<80000)return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);return ''}
+  var s=String(v).trim(),m;
+  if(/^\d{5}(\.\d+)?$/.test(s)&&+s>20000&&+s<80000)return new Date(Math.round((+s-25569)*86400000)).toISOString().slice(0,10);
+  if((m=/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s)))return isoOf(m[1],m[2],m[3]);
+  if((m=/^(\d{1,2})[-\/.\s](\d{1,2})[-\/.\s](\d{2,4})/.exec(s))){var a=+m[1],b=+m[2];return (b>12&&a<=12)?isoOf(m[3],a,b):isoOf(m[3],b,a)}
+  if((m=/^(\d{1,2})(?:st|nd|rd|th)?[\s\-]+([A-Za-z]{3,})\.?,?[\s\-]+(\d{2,4})/.exec(s))){var mi=MONTHS.indexOf(m[2].slice(0,3).toLowerCase());return mi<0?'':isoOf(m[3],mi+1,m[1])}
+  if((m=/^([A-Za-z]{3,})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/.exec(s))){var mj=MONTHS.indexOf(m[1].slice(0,3).toLowerCase());return mj<0?'':isoOf(m[3],mj+1,m[2])}
+  if(/^\d{4}$/.test(s)&&+s>1990&&+s<=new Date().getFullYear())return s+'-01-01';
+  return '';
+}
+function spOf(s,def){
+  s=String(s||'').trim();if(!s)return def||'';
+  var g=guessSpecies(s);if(g)return g;
+  var l=s.toLowerCase();
+  if(/fowl|poultry|chick|hen|rooster|broiler|layer|cock/.test(l))return 'Chickens';
+  if(/cattle|cow|bull|ox|calf|calves|heifer|steer|beef|dairy|tollie|poo/.test(l))return 'Cattle';
+  if(/goat|kid|nanny|billy|doe|buck/.test(l))return 'Goats';
+  if(/sheep|lamb|ram|ewe|wether/.test(l))return 'Sheep';
+  return 'Other';
+}
+function sexOf(s,group){
+  var l=String(s||'').trim().toLowerCase();
+  if(/^mix/.test(l))return group?'Mixed':'Unknown';
+  if(/^(f|fem|female|ewe|doe|nanny|cow|hen|heifer|girl|gilt)/.test(l))return 'Female';
+  if(/^(m|male|ram|buck|billy|bull|ox|steer|rooster|cock|boy|wether|tup)/.test(l))return 'Male';
+  return group?'Mixed':'Unknown';
+}
+function catOf(s,dir,text){
+  var l=(String(s||'')+' '+String(text||'')).toLowerCase();
+  if(dir==='in'){
+    if(/\begg/.test(l))return 'Eggs';
+    if(/milk/.test(l))return 'Milk';
+    if(/sale|sold|sell|animal|goat|sheep|cattle|cow|bull|calf|lamb|chicken|bird|livestock/.test(l))return 'Animal sales';
+    return 'Other';
+  }
+  if(/feed|lucerne|hay|mash|fodder|grain|maize|lick|pellet|bran|salt/.test(l))return 'Feed';
+  if(/vet|medic|vaccin|dip|drug|dewormer|treat|spray|injection|antibiotic|health/.test(l))return 'Health';
+  if(/animals?\b|livestock|bought|purchase of (goat|sheep|cow|cattle)|goats?\b|sheep|cattle|heifer|bull\b/.test(l)&&!/feed/.test(l))return 'Animals';
+  if(/equip|tool|fence|fencing|wire|trough|tank|pump|repair|vehicle|tractor/.test(l))return 'Equipment';
+  if(/labou?r|wage|salary|worker|herd|farm ?hand|casual/.test(l))return 'Labour';
+  return 'Other';
+}
+function impBuild(){
+  var t=impTable(),m=imp.map,res={animals:[],stock:[],tx:[],skipped:0,dup:0,warn:[],sample:[],n:0},batch=imp.batch;
+  var bad={};
+  if(imp.kind==='animals'){
+    var seenTag={},byTag={},counts={},gnames={},unres=0;
+    db.animals.forEach(function(a){if(a.kind==='individual'&&a.tag)byTag[a.species+'|'+a.tag.toLowerCase()]=a.id});
+    var rows=[];
+    t.data.forEach(function(r){
+      var tag=cellOf(r,m.tag),cnt=numOf(cellOf(r,m.count)),raw=cellOf(r,m.species),sp=spOf(raw,imp.defSp);
+      if(!tag&&!(cnt>0)){res.skipped++;return}
+      if(!sp){sp='Other';bad['rows with no type']=1}
+      if(raw&&sp==='Other'&&!/^other$/i.test(raw)&&Object.keys(bad).length<6)bad['"'+raw+'"']=1;
+      var bd=m.birth!==''?dateOf(r[m.birth]):'',birthRaw=m.birth!==''?cellOf(r,m.birth):'';
+      if(birthRaw&&!bd)res.warn.push('Birth date "'+birthRaw+'" was not understood for '+(tag||'a group')+' and was left empty.');
+      if(tag){
+        var key=sp+'|'+tag.toLowerCase();
+        if(byTag[key]||seenTag[key]){res.dup++;return}
+        seenTag[key]=1;
+        var a={id:uid(),tag:tag,species:sp,sex:sexOf(cellOf(r,m.sex),false),qty:1,source:'existing',birth:bd,status:'active',kind:'individual',motherId:'',fatherId:'',imp:batch};
+        byTag[key]=a.id;res.animals.push(a);rows.push({a:a,mo:cellOf(r,m.mother),fa:cellOf(r,m.father)});
+      }else{
+        var sx=sexOf(cellOf(r,m.sex),true),nm=sp+(sx==='Mixed'?'':', '+sx.toLowerCase()+'s')+(bd?', born '+bd.slice(0,4):''),base=nm,k=2;
+        while(gnames[nm.toLowerCase()]||tagTaken(nm)){nm=base+' ('+(k++)+')'}
+        gnames[nm.toLowerCase()]=1;
+        res.animals.push({id:uid(),tag:nm,species:sp,sex:sx,qty:Math.round(cnt),source:'existing',birth:bd,status:'active',kind:'group',motherId:'',fatherId:'',imp:batch});
+      }
+    });
+    rows.forEach(function(r){
+      [['mo','motherId'],['fa','fatherId']].forEach(function(p){
+        var tg=r[p[0]];if(!tg)return;
+        var id=byTag[r.a.species+'|'+tg.toLowerCase()];
+        if(id&&id!==r.a.id)r.a[p[1]]=id;else unres++;
+      });
+    });
+    if(unres)res.warn.push(unres+' mother or father tags were not found in the list, so those links were left empty.');
+    res.animals.forEach(function(a){counts[a.species]=(counts[a.species]||0)+a.qty});
+    Object.keys(counts).forEach(function(sp){res.stock.push({id:uid(),date:today(),type:'existing',species:sp,qty:counts[sp],who:'',price:0,note:'Imported from a spreadsheet',imp:batch})});
+    res.n=res.animals.length;res.counts=counts;
+    res.sample=res.animals.slice(0,8).map(function(a){var mo=aOrNew(a.motherId,res),fa=aOrNew(a.fatherId,res);return [a.tag,a.species,a.kind==='group'?a.sex+' · '+a.qty:a.sex,a.birth?dshort(a.birth):'',mo?mo.tag:'',fa?fa.tag:'']});
+    res.head=['Tag or group','Type','Sex','Born','Mother','Father'];
+  }else{
+    var have={};db.tx.forEach(function(x){have[x.date+'|'+x.dir+'|'+x.amount+'|'+(x.item||'')]=1});
+    var noDate=0,noAmt=0,noDir=0,tin=0,tout=0,dmin='',dmax='';
+    t.data.forEach(function(r){
+      var ds=m.date!==''?dateOf(r[m.date]):'';
+      var dir='',amt=NaN;
+      if(imp.mode==='split'){
+        var ai=numOf(m.mIn!==''?r[m.mIn]:''),ao=numOf(m.mOut!==''?r[m.mOut]:'');
+        if(ai>0&&!(ao>0)){dir='in';amt=ai}else if(ao>0&&!(ai>0)){dir='out';amt=ao}
+        else if(ai>0&&ao>0){dir='in';amt=ai-ao;if(amt<0){dir='out';amt=-amt}}
+      }else if(imp.mode==='kind'){
+        amt=Math.abs(numOf(m.amount!==''?r[m.amount]:''));
+        var kd=cellOf(r,m.kind).toLowerCase();
+        if(/^(out|expense|expenses|spent|cost|paid|payment|debit|dr|purchase|bought|withdrawal)/.test(kd))dir='out';
+        else if(/^(in|income|received|receipt|sale|sales|sold|credit|cr|deposit|revenue)/.test(kd))dir='in';
+      }else{
+        var sv=numOf(m.amount!==''?r[m.amount]:'');
+        if(!isNaN(sv)&&sv!==0){dir=sv<0?'out':'in';amt=Math.abs(sv)}
+      }
+      var empty=!r.some(function(c){return String(c).trim()!==''});
+      if(empty)return;
+      if(!(amt>0)){noAmt++;return}
+      if(!dir){noDir++;return}
+      if(!ds){noDate++;return}
+      var item=cellOf(r,m.item),catRaw=cellOf(r,m.cat),spRaw=cellOf(r,m.species);
+      var cat=catOf(catRaw,dir,item);
+      if(catRaw){var list=dir==='in'?INCATS:OUTCATS,hit=list.filter(function(c){return c.toLowerCase()===catRaw.toLowerCase()})[0];if(hit)cat=hit}
+      var sp=spRaw?spOf(spRaw,''):guessSpecies(item+' '+catRaw);
+      var key=ds+'|'+dir+'|'+amt+'|'+item;
+      if(have[key]){res.dup++;return}
+      have[key]=1;
+      res.tx.push({id:uid(),date:ds,dir:dir,cat:cat,amount:Math.round(amt*100)/100,item:item,supplier:cellOf(r,m.supplier),note:'',species:sp,animalIds:[],imp:batch});
+      if(dir==='in')tin+=amt;else tout+=amt;
+      if(!dmin||ds<dmin)dmin=ds;if(!dmax||ds>dmax)dmax=ds;
+    });
+    res.skipped=noDate+noAmt+noDir;
+    if(noAmt)res.warn.push(noAmt+' rows had no amount and were skipped.');
+    if(noDir)res.warn.push(noDir+' rows could not be told apart as money in or out and were skipped.');
+    if(noDate)res.warn.push(noDate+' rows had no date I could read and were skipped.');
+    res.n=res.tx.length;res.tin=tin;res.tout=tout;res.dmin=dmin;res.dmax=dmax;
+    res.sample=res.tx.slice(0,8).map(function(x){return [dshort(x.date),x.dir==='in'?'In':'Out',x.cat,x.item,x.species,(x.dir==='in'?'+':'-')+num2(x.amount)]});
+    res.head=['Date','In or out','Category','What for','Type','Amount'];
+  }
+  var bl=Object.keys(bad);if(bl.length)res.warn.push(bl.indexOf('rows with no type')>=0&&bl.length===1?'Some rows have no animal type, so they were set to Other. Go back and choose the type column, or pick a type for every row.':'Not sure about the animal type: '+bl.filter(function(x){return x!=='rows with no type'}).slice(0,5).join(', ')+'. These were set to Other.');
+  var seenW={};res.warn=res.warn.filter(function(w){if(seenW[w])return false;seenW[w]=1;return true}).slice(0,8);
+  return res;
+}
+function aOrNew(id,res){if(!id)return null;return aById(id)||res.animals.filter(function(a){return a.id===id})[0]||null}
+function impCommit(){
+  var r=imp.res;if(!r||!r.n)return;
+  r.animals.forEach(function(a){db.animals.push(a)});
+  r.stock.forEach(function(s){db.stock.push(s)});
+  r.tx.forEach(function(x){db.tx.push(x)});
+  db.example=false;
+  db.lastImport={id:imp.batch,at:today(),animals:r.animals.length,tx:r.tx.length};
+  save();
+  var msg='Added '+(imp.kind==='animals'?r.animals.length+' animal records':r.tx.length+' money entries')+'.';
+  imp=null;closeSheet();render();toast(msg);
+}
+function impUndo(){
+  var li=db.lastImport;if(!li)return;
+  var id=li.id,gone={};
+  db.animals.forEach(function(a){if(a.imp===id)gone[a.id]=1});
+  db.animals=db.animals.filter(function(a){return a.imp!==id});
+  db.animals.forEach(function(a){if(gone[a.motherId])a.motherId='';if(gone[a.fatherId])a.fatherId=''});
+  db.tx=db.tx.filter(function(x){return x.imp!==id});
+  db.stock=db.stock.filter(function(s){return s.imp!==id});
+  db.tx.forEach(function(x){x.animalIds=(x.animalIds||[]).filter(function(i){return !gone[i]})});
+  db.lastImport=null;save();confirmKey=null;render();toast('Import removed.');
+}
+function impStart(kind){imp={kind:kind||'animals',step:'pick',sheets:[],si:0,hdr:true,map:{},defSp:'',mode:'kind',batch:uid(),res:null,fname:'',err:''}}
+function impLoad(sheets,fname){
+  sheets=sheets.filter(function(s){return s.rows.some(function(r){return r&&r.some(function(c){return String(c).trim()!==''})})&&!/^how to use$/i.test(s.name)});
+  if(!sheets.length){imp.err='That file has no rows I can read.';renderImport();return}
+  imp.sheets=sheets;imp.si=0;imp.fname=fname||'';imp.err='';imp.step='map';impGuess();renderImport();
+}
+function impFile(file){
+  imp.err='';var name=file.name||'file';
+  if(/\.xls$/i.test(name)){imp.err='This is an old .xls file. In Excel choose Save As, then pick .xlsx or CSV, and try again.';renderImport();return}
+  var rd=new FileReader();
+  if(/\.(xlsx|xlsm)$/i.test(name)){
+    rd.onload=function(){parseXlsx(rd.result).then(function(s){impLoad(s,name)},function(){imp.err='I could not read that file. Try saving it again as .xlsx or CSV.';renderImport()})};
+    rd.onerror=function(){imp.err='Could not open that file.';renderImport()};
+    rd.readAsArrayBuffer(file);
+  }else{
+    rd.onload=function(){impLoad([{name:'Sheet 1',rows:parseCsv(rd.result)}],name)};
+    rd.onerror=function(){imp.err='Could not open that file.';renderImport()};
+    rd.readAsText(file);
+  }
+}
+function impSelect(field,label,heads,cur){
+  return '<label class="f">'+label+'<select data-imp="f_'+field+'"><option value="">Not in my file</option>'+heads.map(function(h,i){return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(h)+'</option>'}).join('')+'</select></label>';
+}
+function impBody(){
+  var h='';
+  if(imp.err)h+='<div class="warnbox" role="alert">'+esc(imp.err)+'</div>';
+  if(imp.step==='pick'){
+    h+='<div class="small muted">Bring in records you already keep in Excel, Google Sheets or a CSV file. You see a preview before anything is added.</div>'+
+      '<label class="f">What are you bringing in?<select data-imp="kind"><option value="animals"'+(imp.kind==='animals'?' selected':'')+'>My animals</option><option value="money"'+(imp.kind==='money'?' selected':'')+'>Money in and out</option></select></label>'+
+      '<label class="f">Choose a file (.xlsx or .csv)<input type="file" id="impSheet" accept=".xlsx,.xlsm,.csv,.tsv,.txt"></label>'+
+      '<label class="f">Or paste rows copied from Excel or Google Sheets<textarea id="impPaste" rows="4" placeholder="Copy the cells, including the heading row, then paste here"></textarea></label>'+
+      '<button class="btn" data-a="imppaste">Use the pasted rows</button>'+
+      '<button class="btn" data-a="imptpl">Download a blank template</button>'+
+      '<div class="small muted">Tip: a farm with 100 goats does not need 100 tagged records. Leave the tag empty and fill the number column to add them as one group.</div>';
+    return h;
+  }
+  var t=impTable();
+  if(imp.step==='map'){
+    h+='<div class="small muted">'+esc(imp.fname||'Pasted rows')+' · '+t.data.length+' rows</div>';
+    if(imp.sheets.length>1)h+='<label class="f">Sheet<select data-imp="si">'+imp.sheets.map(function(s,i){return '<option value="'+i+'"'+(i===imp.si?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select></label>';
+    h+='<label class="pick" style="align-self:flex-start"><input type="checkbox" data-imp="hdr"'+(imp.hdr?' checked':'')+'><span>First row is the headings</span></label>';
+    h+='<h3>Which column is which?</h3><div class="small muted">I guessed from the headings. Change anything that is wrong.</div>';
+    var m=imp.map;
+    if(imp.kind==='animals'){
+      IMPF.animals.forEach(function(d){h+=impSelect(d[0],d[1],t.heads,m[d[0]])});
+      h+='<label class="f">Animal type for every row that has none<select data-imp="defSp"><option value="">Not set</option>'+SPECIES.map(function(s){return '<option'+(imp.defSp===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select></label>';
+    }else{
+      h+=impSelect('date','Date',t.heads,m.date);
+      h+='<label class="f">How are money in and out shown?<select data-imp="mode"><option value="kind"'+(imp.mode==='kind'?' selected':'')+'>One amount column and a column saying in or out</option><option value="split"'+(imp.mode==='split'?' selected':'')+'>Separate columns for money in and money out</option><option value="sign"'+(imp.mode==='sign'?' selected':'')+'>One amount column, minus numbers are money out</option></select></label>';
+      if(imp.mode==='split'){h+=impSelect('mIn','Money in column',t.heads,m.mIn)+impSelect('mOut','Money out column',t.heads,m.mOut)}
+      else{h+=impSelect('amount','Amount',t.heads,m.amount);if(imp.mode==='kind')h+=impSelect('kind','In or out',t.heads,m.kind)}
+      ['cat','item','species','supplier'].forEach(function(k){var d=IMPF.money.filter(function(x){return x[0]===k})[0];h+=impSelect(k,d[1],t.heads,m[k])});
+    }
+    h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button><button class="btn pri" data-a="imppreview" style="flex:1">Preview</button></div>';
+    return h;
+  }
+  var r=imp.res;
+  if(!r.n){
+    h+='<div class="warnbox">Nothing could be added with these settings.</div>';
+  }else if(imp.kind==='animals'){
+    var parts=Object.keys(r.counts).map(function(sp){return r.counts[sp]+' '+sp.toLowerCase()}).join(', ');
+    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Records</span></div><div class="tile"><b class="num">'+Object.keys(r.counts).reduce(function(s,k){return s+r.counts[k]},0)+'</b><span>Animals</span></div><div class="tile"><b class="num">'+(r.dup+r.skipped)+'</b><span>Skipped</span></div></div><div class="small muted">'+esc(parts)+'</div>';
+  }else{
+    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Entries</span></div><div class="tile"><b class="num">'+moneyC(r.tin)+'</b><span>In</span></div><div class="tile"><b class="num">'+moneyC(r.tout)+'</b><span>Out</span></div></div><div class="small muted">'+dshort(r.dmin)+' to '+dshort(r.dmax)+'</div>';
+  }
+  if(r.dup)h+='<div class="small muted">'+r.dup+' rows were already in the app and will be skipped.</div>';
+  if(r.skipped&&imp.kind==='animals')h+='<div class="small muted">'+r.skipped+' empty rows were skipped.</div>';
+  r.warn.forEach(function(w){h+='<div class="warnbox">'+esc(w)+'</div>'});
+  if(r.sample.length)h+='<div class="tw"><table class="t"><thead><tr>'+r.head.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.sample.map(function(row){return '<tr>'+row.map(function(c){return '<td>'+esc(c)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div><div class="small muted">First '+r.sample.length+' of '+r.n+' shown.</div>';
+  h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button>'+(r.n?'<button class="btn pri" data-a="impgo" style="flex:1">Add '+r.n+(imp.kind==='animals'?' records':' entries')+'</button>':'')+'</div>';
+  return h;
+}
+function fImport(){if(!imp)impStart('animals');return head('Import from Excel or CSV')+'<div class="stack" id="impBody">'+impBody()+'</div>'}
+function renderImport(){var el=document.getElementById('impBody');if(el)el.innerHTML=impBody()}
+function impTemplate(){
+  var A=[['Tag','Type','Sex','Birth date','Mother','Father','Count']];
+  var M=[['Date','In or out','Category','What for','Animal type','Amount','Supplier or buyer']];
+  var H=[['How to use this template'],['Animals sheet: one row for each animal you want to follow by tag. For animals you do not tag, leave Tag empty and put the number in Count.'],['Money sheet: one row for each payment. In or out is In or Out. Dates like 2026-03-14 or 14/03/2026 both work.'],['Delete nothing else. Headings can be in any order, and you can add your own columns.']];
+  return xlsxBlob([{name:'Animals',rows:A,widths:[14,12,10,13,12,12,9]},{name:'Money',rows:M,widths:[13,11,14,26,13,10,20]},{name:'How to use',rows:H,widths:[110]}]);
+}
+
 function vMore(){
   var due=backupDue();
   var h='<h2>Backup and data</h2>';
   h+=cCloud();
+  h+='<div class="card"><h3>Excel and PDF</h3><div class="small muted">Take your records out as a spreadsheet, or make a printable report for a bank, a vet or your own files.</div>'+
+    '<button class="btn pri" data-a="expxl">Export everything to Excel</button>'+
+    '<label class="f">Report for<select id="repPer">'+Object.keys(PERIODS).map(function(k){return '<option value="'+k+'"'+(repPer===k?' selected':'')+'>'+PERIODS[k]+'</option>'}).join('')+'</select></label>'+
+    '<button class="btn" data-a="reppdf">Make a PDF report</button><div class="small muted">On the print screen that opens, choose Save as PDF.</div></div>';
+  h+='<div class="card"><h3>Import from Excel or CSV</h3><div class="small muted">Already keep records in a spreadsheet? Bring them in instead of typing them again. You see a preview first.</div>'+
+    '<button class="btn pri" data-a="open" data-k="import">Import records</button>'+
+    (db.lastImport?'<div class="small muted">Last import: '+(db.lastImport.animals?db.lastImport.animals+' animal records':'')+(db.lastImport.animals&&db.lastImport.tx?', ':'')+(db.lastImport.tx?db.lastImport.tx+' money entries':'')+' on '+dshort(db.lastImport.at)+'.</div>'+(confirmKey==='impundo'?'<div class="row"><button class="btn bad" data-a="impundo" style="flex:1">Yes, remove them</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="impundo1">Undo that import</button>'):'')+'</div>';
   h+='<div class="card"><h3>Share a backup file</h3><div class="row"><span class="pill '+(due?'warn':db.lastBackup?'good':'')+'">'+backupStatus()+'</span></div>'+
     '<div class="small muted">Another safety copy. Send a backup to yourself on WhatsApp, email or Google Drive, and you can restore it on any phone.</div>'+
     '<button class="btn pri" data-a="share">Share backup</button>'+
@@ -1255,8 +1801,9 @@ function shiftMonth(n){var y=+calMonth.slice(0,4),m=+calMonth.slice(5,7)-1+n;y+=
 
 function openSheet(kind,pre){
   cur={kind:kind,pre:pre||{}};
+  if(kind==='import')impStart('animals');
   if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
-  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice}[kind](cur.pre);
+  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport}[kind](cur.pre);
   if(!html){cur=null;return}
   var host=document.getElementById('sheetHost');
   host.innerHTML='<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
@@ -1475,6 +2022,24 @@ var actions={
  cpull:function(){actions.cpull1()},
  cdel1:function(){confirmKey='cdel';render()},
  cdelete:function(){confirmKey=null;cloudRun('Deleting...',function(){return cloudDelete()})},
+ expxl:function(){exportExcel()},
+ reppdf:function(){printReport(repPer)},
+ imppaste:function(){var el=document.getElementById('impPaste');if(!el||!el.value.trim()){imp.err='Paste some rows first.';renderImport();return}impLoad([{name:'Pasted rows',rows:parseCsv(el.value)}],'')},
+ imptpl:function(){deliverFile('farm-book-template.xlsx',impTemplate(),function(){toast('Template saved. Fill it in, then import it.')})},
+ impback:function(){if(!imp)return;imp.err='';if(imp.step==='preview')imp.step='map';else imp.step='pick';renderImport()},
+ imppreview:function(){
+  var m=imp.map;imp.err='';
+  if(imp.kind==='animals'&&m.tag===''&&m.count===''){imp.err='Choose the column with the tag numbers, or the column with the number of animals.';renderImport();return}
+  if(imp.kind==='money'){
+    if(m.date===''){imp.err='Choose the date column.';renderImport();return}
+    if(imp.mode==='split'?(m.mIn===''&&m.mOut===''):m.amount===''){imp.err='Choose the amount column.';renderImport();return}
+    if(imp.mode==='kind'&&m.kind===''){imp.err='Choose the column that says in or out, or pick another way above.';renderImport();return}
+  }
+  imp.res=impBuild();imp.step='preview';renderImport();
+ },
+ impgo:function(){impCommit()},
+ impundo1:function(){confirmKey='impundo';render()},
+ impundo:function(){impUndo()},
  ics:function(){try{downloadText('farm-book-reminder.ics',icsText(),'text/calendar');toast('Open the downloaded file to add the reminder to your calendar.')}catch(e){toast('Not available here. Use the Google Calendar button.')}},
  import:function(){var el=document.getElementById('impTxt');if(!el||!el.value.trim()){toast('Paste a backup first, or choose a file.');return}doImport(el.value)}
 };
@@ -1492,6 +2057,18 @@ document.addEventListener('submit',function(e){
 });
 document.addEventListener('change',function(e){
   var el=e.target;
+  if(el.id==='impSheet'&&el.files&&el.files[0]&&imp){impFile(el.files[0]);return}
+  if(el.id==='repPer'){repPer=el.value;return}
+  if(el.dataset&&el.dataset.imp&&imp){
+    var ik=el.dataset.imp;
+    if(ik==='kind')imp.kind=el.value;
+    else if(ik==='si'){imp.si=+el.value;impGuess()}
+    else if(ik==='hdr'){imp.hdr=el.checked;impGuess()}
+    else if(ik==='defSp')imp.defSp=el.value;
+    else if(ik==='mode')imp.mode=el.value;
+    else if(ik.indexOf('f_')===0)imp.map[ik.slice(2)]=el.value===''?'':+el.value;
+    renderImport();return;
+  }
   if(el.id==='impFile'&&el.files&&el.files[0]){var r=new FileReader();r.onload=function(){doImport(r.result)};r.onerror=function(){toast('Could not read that file.')};r.readAsText(el.files[0]);return}
   var form=el.form;if(!form)return;
   if(form.id==='evForm'){
