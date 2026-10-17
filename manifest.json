@@ -1,6 +1,6 @@
 {
-  "name": "Farm Book",
-  "short_name": "Farm Book",
+  "name": "CHELETE Farm Book",
+  "short_name": "CHELETE Farm",
   "description": "Animal health, stock, feed and spending for the farm",
   "start_url": "./index.html",
   "scope": "./",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Farm Book</title>
+<title>CHELETE Farm Book</title>
 <meta name="theme-color" content="#2E6A4E">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -179,6 +179,7 @@ table.t tr.clk:hover{background:var(--soft)}
   body.wide .narrow{max-width:720px;display:flex;flex-direction:column;gap:16px}
   body.wide .nav{top:0;right:auto;bottom:0;width:172px;flex-direction:column;justify-content:flex-start;border-top:0;border-right:1px solid var(--line);padding:18px 10px}
   body.wide .nav #nav{flex-direction:column;max-width:none;gap:4px}
+  body.wide .nav .brand small{display:block;font:600 .8rem var(--body);color:var(--muted);letter-spacing:.02em}
   body.wide .nav .brand{display:block;font:700 1.25rem var(--display);padding:4px 10px 16px;color:var(--accent);flex:none}
   body.wide .nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;font-size:.95rem}
   body.wide .scrim{align-items:center}
@@ -205,6 +206,8 @@ table.t tr.clk:hover{background:var(--soft)}
   #printRoot .pt tr{break-inside:avoid}
   #printRoot .pt tfoot td{font-weight:700;border-top:1pt solid #000}
 }
+.scnline{padding:10px;gap:8px}
+.scnline input,.scnline select{min-height:40px}
 </style>
 </head>
 <body>
@@ -803,7 +806,7 @@ function cTx(){
 }
 function vMoney(){
   var T=totals(period),net=T.tin-T.tout,w=isWide();
-  var h='<div class="row"><h2>Money</h2><div class="row"><button class="btn" data-a="open" data-k="cal">Calendar</button><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div></div>';
+  var h='<div class="row"><h2>Money</h2><div class="row"><button class="btn" data-a="open" data-k="cal">Calendar</button><button class="btn" data-a="open" data-k="scan">Scan</button><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div></div>';
   h+=periodChips();
   h+='<div class="card"><div class="grid"><div class="tile"><b class="num">'+money(T.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(T.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div></div>';
   h+=w?'<div class="cols2">'+cExpPie()+cIncPie()+'</div>':cExpPie()+cIncPie();
@@ -1020,19 +1023,19 @@ function doImport(v){
     if(!o||!Array.isArray(o.animals)||!Array.isArray(o.tx))throw 0;
     o=fix(o);o.example=false;o.lastBackup=today();
     db=o;save();render();toast('Restored '+db.animals.length+' animal records and '+db.tx.length+' transactions.');
-  }catch(e){toast('That does not look like a Farm Book backup.')}
+  }catch(e){toast('That does not look like a CHELETE Farm Book backup.')}
 }
 function reminderLinks(){
   var start=addDays(today(),7).replace(/-/g,'');
-  var text='Back up Farm Book',det='Open Farm Book, tap Backup, then tap Share backup and send it to WhatsApp or email.';
+  var text='Back up CHELETE Farm Book',det='Open CHELETE Farm Book, tap Backup, then tap Share backup and send it to WhatsApp or email.';
   var g='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(text)+'&details='+encodeURIComponent(det)+'&dates='+start+'T180000/'+start+'T181500&recur='+encodeURIComponent('RRULE:FREQ=WEEKLY');
   return g;
 }
 function icsText(){
   var start=addDays(today(),7).replace(/-/g,'');
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Farm Book//EN','BEGIN:VEVENT','UID:farmbook-backup-'+uid()+'@farmbook','DTSTAMP:'+today().replace(/-/g,'')+'T000000Z',
-    'DTSTART:'+start+'T180000','DTEND:'+start+'T181500','RRULE:FREQ=WEEKLY','SUMMARY:Back up Farm Book','DESCRIPTION:Open Farm Book\\, tap Backup\\, then tap Share backup.',
-    'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Back up Farm Book','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CHELETE Farm Book//EN','BEGIN:VEVENT','UID:farmbook-backup-'+uid()+'@farmbook','DTSTAMP:'+today().replace(/-/g,'')+'T000000Z',
+    'DTSTART:'+start+'T180000','DTEND:'+start+'T181500','RRULE:FREQ=WEEKLY','SUMMARY:Back up CHELETE Farm Book','DESCRIPTION:Open CHELETE Farm Book\\, tap Backup\\, then tap Share backup.',
+    'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Back up CHELETE Farm Book','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
 }
 
 /* ---------- spreadsheet files (built in, no outside library) ---------- */
@@ -1229,7 +1232,7 @@ function reportHtml(per){
   var T=totals(per),pd=profitData(per,false),txs=periodTx(per).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
   function tbl(head,rows,foot){return '<table class="pt"><thead><tr>'+head.map(function(h,i){return '<th'+(i>0&&h.r?' class="r"':'')+'>'+esc(h.t||h)+'</th>'}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody>'+(foot||'')+'</table>'}
   var R=function(t){return {t:t,r:true}};
-  var h='<h1>Farm Book report</h1><p class="pm">'+(db.example?'Example records. ':'')+PERIODS[per]+' · made '+dshort(today())+'</p>';
+  var h='<h1>CHELETE Farm Book report</h1><p class="pm">'+(db.example?'Example records. ':'')+PERIODS[per]+' · made '+dshort(today())+'</p>';
   h+='<h2>Summary</h2>'+tbl(['',R('Amount')],[
     '<tr><td>Money in</td><td class="r">'+money(T.tin)+'</td></tr>','<tr><td>Money spent</td><td class="r">'+money(T.tout)+'</td></tr>','<tr><td><b>Net</b></td><td class="r"><b>'+money(T.tin-T.tout)+'</b></td></tr>']);
   h+='<h2>Profit per animal type</h2>';
@@ -1456,10 +1459,10 @@ function impBuild(){
 function aOrNew(id,res){if(!id)return null;return aById(id)||res.animals.filter(function(a){return a.id===id})[0]||null}
 function impCommit(){
   var r=imp.res;if(!r||!r.n)return;
+  if(db.example)db=blank();
   r.animals.forEach(function(a){db.animals.push(a)});
   r.stock.forEach(function(s){db.stock.push(s)});
   r.tx.forEach(function(x){db.tx.push(x)});
-  db.example=false;
   db.lastImport={id:imp.batch,at:today(),animals:r.animals.length,tx:r.tx.length};
   save();
   var msg='Added '+(imp.kind==='animals'?r.animals.length+' animal records':r.tx.length+' money entries')+'.';
@@ -1557,6 +1560,152 @@ function impTemplate(){
   return xlsxBlob([{name:'Animals',rows:A,widths:[14,12,10,13,12,12,9]},{name:'Money',rows:M,widths:[13,11,14,26,13,10,20]},{name:'How to use',rows:H,widths:[110]}]);
 }
 
+/* ---------- scan a receipt (Gemini through Firebase AI Logic) ---------- */
+var SCAN_URL='https://www.gstatic.com/firebasejs/12.19.0/';
+var SCAN_KEY='';   /* reCAPTCHA Enterprise site key for App Check (public) */
+var SCAN_MODELS=['gemini-3.8-flash','gemini-3.5-flash'];
+var scanSdk=null,scanP=null,scn=null;
+function scanInit(){
+  if(scanSdk)return Promise.resolve(scanSdk);
+  if(scanP)return scanP;
+  scanP=Promise.all([import(SCAN_URL+'firebase-app.js'),import(SCAN_URL+'firebase-app-check.js'),import(SCAN_URL+'firebase-ai.js')]).then(function(m){
+    var app=m[0].initializeApp(FBCFG,'scan');
+    if(SCAN_KEY)m[1].initializeAppCheck(app,{provider:new m[1].ReCaptchaEnterpriseProvider(SCAN_KEY),isTokenAutoRefreshEnabled:true});
+    scanSdk={ai:m[2].getAI(app,{backend:new m[2].GoogleAIBackend()}),M:m[2]};
+    return scanSdk;
+  },function(e){scanP=null;throw e});
+  return scanP;
+}
+function scanPrompt(){
+  return 'You read shop receipts and invoices for a small farm in Botswana. Look at the photo and answer with JSON only, in exactly this shape:\n'+
+  '{"supplier":string or null,"date":"YYYY-MM-DD" or null,"total":number or null,"lines":[{"description":string,"amount":number,"category":"Feed"|"Health"|"Animals"|"Equipment"|"Labour"|"Other","species":"Cattle"|"Goats"|"Sheep"|"Chickens"|"Other"|""}]}\n'+
+  'Rules: supplier is the shop or seller name. If the date is day/month/year or month/day/year and not obvious, assume day first unless a number above 12 shows otherwise. '+
+  '"amount" is what was paid for that line in total, as a plain number with no currency sign. Skip lines that are not purchases (headings, change, card details). '+
+  'Put VAT or tax on its own line only if it is shown as a separate amount. '+
+  'Categories: Feed = animal feed, lucerne, hay, grain, mash, licks, fodder, vegetables or fruit bought as feed; Health = vaccines, dewormers, dip, medicine, vet; Animals = livestock bought; Equipment = tools, fencing, troughs, repairs, fuel; Labour = wages; Other = anything else. '+
+  'Set species only when the receipt makes it clear (for example "layer mash" is Chickens), otherwise "". Do not invent anything you cannot read: use null.';
+}
+function scanErr(e){
+  var m=String(e&&(e.message||e.code)||'').toLowerCase();
+  if(!navigator.onLine||/network|failed to fetch|offline|load failed/.test(m))return 'No internet connection. Scanning needs signal. You can add the entry by hand.';
+  if(/quota|429|resource_exhausted|rate/.test(m))return 'The free scanning allowance is used up for now. Try again later, or add the entry by hand.';
+  if(/app.?check|permission|403|api key|not enabled|unauthor/.test(m))return 'Scanning is not switched on for this app yet.';
+  if(/json|parse|unreadable/.test(m))return 'I could not read that photo. Try again with the whole receipt flat and in good light.';
+  return 'Something went wrong while reading the photo. Try again, or add the entry by hand.';
+}
+function scanImage(file){
+  return new Promise(function(resolve,reject){
+    var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){
+      var max=1600,w=img.naturalWidth,h=img.naturalHeight,k=Math.min(1,max/Math.max(w,h)),c=document.createElement('canvas');
+      c.width=Math.round(w*k);c.height=Math.round(h*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      var d=c.toDataURL('image/jpeg',0.85);
+      resolve({inlineData:{data:d.split(',')[1],mimeType:'image/jpeg'}});
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);reject(new Error('unreadable image'))};
+    img.src=url;
+  });
+}
+function scanGenerate(part){
+  return scanInit().then(function(s){
+    var i=0;
+    function go(){
+      var model=s.M.getGenerativeModel(s.ai,{model:SCAN_MODELS[i],generationConfig:{responseMimeType:'application/json',temperature:0}});
+      return model.generateContent([scanPrompt(),part]).then(function(r){return r.response.text()},function(e){
+        if(i<SCAN_MODELS.length-1&&/not.?found|404|no longer available|not supported/i.test(String(e&&e.message))){i++;return go()}
+        throw e;
+      });
+    }
+    return go();
+  });
+}
+function shopMap(){try{return JSON.parse(localStorage.getItem('farmbook.shopmap')||'{}')}catch(e){return {}}}
+function shopKey(sup,desc){return String(sup||'').trim().toLowerCase()+'|'+String(desc||'').trim().toLowerCase()}
+function scanParse(txt){
+  var o;
+  try{o=JSON.parse(String(txt).replace(/^```(?:json)?/i,'').replace(/```$/,'').trim())}catch(e){throw new Error('unreadable json')}
+  if(!o||typeof o!=='object')throw new Error('unreadable json');
+  var sup=o.supplier?String(o.supplier).trim():'',ds=dateOf(o.date)||'',map=shopMap(),lines=[];
+  (Array.isArray(o.lines)?o.lines:[]).forEach(function(l){
+    var a=numOf(l&&l.amount);if(!(a>0))return;
+    var d=String(l.description||'').trim().slice(0,80),cat=OUTCATS.indexOf(l.category)>=0?l.category:'Other',sp=SPECIES.indexOf(l.species)>=0?l.species:'',mem=map[shopKey(sup,d)];
+    if(mem){cat=OUTCATS.indexOf(mem.c)>=0?mem.c:cat;sp=typeof mem.s==='string'?mem.s:sp}
+    lines.push({d:d,a:Math.round(a*100)/100,cat:cat,sp:sp});
+  });
+  var total=numOf(o.total),sum=lines.reduce(function(s,l){return s+l.a},0);
+  if(total>0&&total-sum>0.009&&lines.length)lines.push({d:'Tax or other charges',a:Math.round((total-sum)*100)/100,cat:'Other',sp:''});
+  return {supplier:sup,date:ds,total:total>0?Math.round(total*100)/100:Math.round(sum*100)/100,lines:lines};
+}
+function scanStart(){scn={step:'pick',err:'',supplier:'',date:'',total:0,lines:[],mode:'lines',dup:''}}
+function scanRead(file){
+  scn.step='busy';scn.err='';renderScan();
+  scanImage(file).then(scanGenerate).then(function(t){
+    var r=scanParse(t);
+    if(!r.lines.length)throw new Error('unreadable json');
+    scn.supplier=r.supplier;scn.date=r.date||today();scn.total=r.total;scn.lines=r.lines;scn.mode=r.lines.length>1?'lines':'one';scn.step='review';scnDup();renderScan();
+  }).catch(function(e){scn.step='pick';scn.err=scanErr(e);renderScan()});
+}
+function scnDup(){
+  var sup=scn.supplier.toLowerCase(),amts=[scn.total].concat(scn.lines.map(function(l){return l.a}));
+  var hit=db.tx.some(function(x){return x.dir==='out'&&x.date===scn.date&&(!sup||(x.supplier||'').toLowerCase()===sup)&&amts.some(function(a){return Math.abs(x.amount-a)<0.005})});
+  scn.dup=hit?'There is already an entry on this date from this shop with the same amount. Check this receipt was not saved before.':'';
+}
+function scnSum(){return Math.round(scn.lines.reduce(function(s,l){return s+(+l.a||0)},0)*100)/100}
+function scanBody(){
+  var h='';
+  if(scn.step==='busy')return '<div class="small muted" role="status">Reading the receipt... this can take a few seconds.</div>';
+  if(scn.err)h+='<div class="warnbox" role="alert">'+esc(scn.err)+'</div>';
+  if(scn.step==='pick'){
+    var ok=false;try{ok=localStorage.getItem('farmbook.scanok')==='1'}catch(e){}
+    h+='<div class="small muted">Take a photo of a receipt or invoice. It fills in the date, shop and items for you to check before anything is saved.</div>'+
+      '<div class="small muted">Tips: lay the paper flat, fit all of it in the photo, and use good light.</div>'+
+      '<div class="warnbox">The photo is sent to Google\'s Gemini AI to be read. Google\'s free service may keep what you send and people at Google may review it, so only scan receipts you are happy to share. The app does not keep the photo.</div>'+
+      '<label class="pick" style="align-self:flex-start"><input type="checkbox" id="scnOk"'+(ok?' checked':'')+'><span>I understand</span></label>'+
+      '<label class="f">Take a photo or choose one<input type="file" id="scnFile" accept="image/*" capture="environment"></label>'+
+      '<button class="btn" data-a="open" data-k="tx">Add it by hand instead</button>';
+    return h;
+  }
+  var diff=Math.round((scn.total-scnSum())*100)/100;
+  h+='<div class="two"><label class="f">Date<input type="date" data-scn="date" value="'+esc(scn.date)+'"></label><label class="f">Shop<input data-scn="supplier" value="'+esc(scn.supplier)+'"></label></div>';
+  h+='<h3>What was bought</h3><div class="small muted">Fix anything that is wrong. Remove lines that are not for the farm.</div>';
+  scn.lines.forEach(function(l,i){
+    h+='<div class="card scnline"><input data-scn="d" data-i="'+i+'" value="'+esc(l.d)+'" placeholder="What it was" aria-label="What it was">'+
+      '<div class="two"><input type="number" min="0" step="0.01" inputmode="decimal" data-scn="a" data-i="'+i+'" value="'+l.a+'" aria-label="Amount"><select data-scn="cat" data-i="'+i+'" aria-label="Category">'+opts(OUTCATS,l.cat)+'</select></div>'+
+      '<div class="two"><select data-scn="sp" data-i="'+i+'" aria-label="For which animals">'+spOpts('out',l.sp)+'</select><button class="btn sm" data-a="scnrm" data-i="'+i+'">Remove</button></div></div>';
+  });
+  h+='<button class="btn sm" data-a="scnadd" style="align-self:flex-start">+ Add a line</button>';
+  h+='<div class="row"><span>Lines add up to</span><b class="num">'+money(scnSum())+'</b></div>';
+  if(scn.total>0&&Math.abs(diff)>0.009)h+='<div class="small muted">The receipt total read as '+money(scn.total)+', which is '+money(Math.abs(diff))+(diff>0?' more':' less')+' than the lines.</div>';
+  if(scn.dup)h+='<div class="warnbox">'+esc(scn.dup)+'</div>';
+  h+='<label class="f">Save as<select data-scn="mode"><option value="lines"'+(scn.mode==='lines'?' selected':'')+'>One entry for each line</option><option value="one"'+(scn.mode==='one'?' selected':'')+'>One entry for the whole receipt</option></select></label>';
+  h+='<div class="row"><button class="btn" data-a="scnagain" style="flex:1">Scan another</button><button class="btn pri" data-a="scnsave" style="flex:1">Save</button></div>';
+  return h;
+}
+function fScan(){if(!scn)scanStart();return head('Scan a receipt')+'<div class="stack" id="scanBody">'+scanBody()+'</div>'}
+function renderScan(){var el=document.getElementById('scanBody');if(el)el.innerHTML=scanBody()}
+function scanSave(){
+  var ds=dateOf(scn.date);
+  if(!ds){scn.err='Choose a date for this receipt.';renderScan();return}
+  var lines=scn.lines.filter(function(l){return +l.a>0});
+  if(!lines.length){scn.err='There are no amounts to save.';renderScan();return}
+  if(db.example)db=blank();
+  var sup=scn.supplier.trim(),map=shopMap(),made=0,tot=0;
+  lines.forEach(function(l){var k=shopKey(sup,l.d);if(sup&&l.d)map[k]={c:l.cat,s:l.sp}});
+  var ks=Object.keys(map);if(ks.length>300)ks.slice(0,ks.length-300).forEach(function(k){delete map[k]});
+  try{localStorage.setItem('farmbook.shopmap',JSON.stringify(map))}catch(e){}
+  if(scn.mode==='one'){
+    var big=lines.slice().sort(function(a,b){return b.a-a.a})[0],sps={};lines.forEach(function(l){sps[l.sp]=1});
+    var amt=lines.reduce(function(s,l){return s+(+l.a)},0);
+    db.tx.push({id:uid(),date:ds,dir:'out',cat:big.cat,amount:Math.round(amt*100)/100,item:(sup?sup+': ':'')+lines.map(function(l){return l.d}).filter(Boolean).slice(0,3).join(', '),supplier:sup,note:'',species:Object.keys(sps).length===1?big.sp:'',animalIds:[]});
+    made=1;tot=amt;
+  }else{
+    lines.forEach(function(l){db.tx.push({id:uid(),date:ds,dir:'out',cat:l.cat,amount:Math.round(l.a*100)/100,item:l.d,supplier:sup,note:'',species:l.sp,animalIds:[]});made++;tot+=+l.a});
+  }
+  scn=null;closeSheet();render();
+  save();toast('Saved '+made+(made===1?' entry':' entries')+' totalling '+money(tot)+'.');
+}
 function vMore(){
   var due=backupDue();
   var h='<h2>Backup and data</h2>';
@@ -1585,14 +1734,14 @@ function vMore(){
 function render(){
   var app=document.getElementById('app'),w=isWide();
   if(!calMonth){calMonth=today().slice(0,7);calDay=today()}
-  var head='<div class="top"><div><h1>Farm Book</h1><small>'+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})+'</small></div><div class="num" style="text-align:right"><b style="font-family:var(--display);font-size:1.4rem">'+count()+'</b><small>animals</small></div></div>';
+  var head='<div class="top"><div><h1>CHELETE Farm Book</h1><small>'+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})+'</small></div><div class="num" style="text-align:right"><b style="font-family:var(--display);font-size:1.4rem">'+count()+'</b><small>animals</small></div></div>';
   var ban=db.example?'<div class="banner"><span>Showing example records</span><button class="btn sm" data-a="tab" data-v="more">Start with my own</button></div>':'';
   var bd=backupDue();
   var bban=bd?'<div class="banner"><span>'+bd.text+'. Back up now so you do not lose records.</span><button class="btn sm" data-a="share">Back up</button></div>':'';
   var v={home:vHome,animals:vAnimals,health:vHealth,money:vMoney,more:vMore}[tab]();
   if(w&&tab==='more')v='<div class="narrow">'+v+'</div>';
   app.innerHTML=head+ban+bban+v;
-  document.getElementById('nav').innerHTML='<div class="brand">Farm Book</div>'+TABS.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[2]]+t[1]+'</button>'}).join('');
+  document.getElementById('nav').innerHTML='<div class="brand">CHELETE<small>Farm Book</small></div>'+TABS.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[2]]+t[1]+'</button>'}).join('');
   document.body.classList.toggle('wide',w);
 }
 
@@ -1802,8 +1951,9 @@ function shiftMonth(n){var y=+calMonth.slice(0,4),m=+calMonth.slice(5,7)-1+n;y+=
 function openSheet(kind,pre){
   cur={kind:kind,pre:pre||{}};
   if(kind==='import')impStart('animals');
+  if(kind==='scan')scanStart();
   if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
-  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport}[kind](cur.pre);
+  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport,scan:fScan}[kind](cur.pre);
   if(!html){cur=null;return}
   var host=document.getElementById('sheetHost');
   host.innerHTML='<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
@@ -1992,7 +2142,7 @@ var actions={
   var txt=backupText(),f=null;
   try{f=new File([txt],backupName(),{type:'text/plain'})}catch(e){}
   if(f&&navigator.canShare&&navigator.canShare({files:[f]})){
-    navigator.share({files:[f],title:'Farm Book backup',text:'Farm Book backup '+today()}).then(function(){markBackup();toast('Backup shared.')},function(err){if(!err||err.name!=='AbortError')toast('Sharing failed. Try Copy as text.')});
+    navigator.share({files:[f],title:'CHELETE Farm Book backup',text:'CHELETE Farm Book backup '+today()}).then(function(){markBackup();toast('Backup shared.')},function(err){if(!err||err.name!=='AbortError')toast('Sharing failed. Try Copy as text.')});
     return;
   }
   try{downloadText(backupName(),txt,'text/plain');markBackup();toast('Sharing is not available here, so the backup was saved to Downloads. Send that file to yourself.')}catch(e){toast('Could not back up. Try Copy as text.')}
@@ -2038,6 +2188,10 @@ var actions={
   imp.res=impBuild();imp.step='preview';renderImport();
  },
  impgo:function(){impCommit()},
+ scnrm:function(d){scn.lines.splice(+d.i,1);renderScan()},
+ scnadd:function(){scn.lines.push({d:'',a:0,cat:'Feed',sp:''});renderScan()},
+ scnagain:function(){scanStart();renderScan()},
+ scnsave:function(){scanSave()},
  impundo1:function(){confirmKey='impundo';render()},
  impundo:function(){impUndo()},
  ics:function(){try{downloadText('farm-book-reminder.ics',icsText(),'text/calendar');toast('Open the downloaded file to add the reminder to your calendar.')}catch(e){toast('Not available here. Use the Google Calendar button.')}},
@@ -2059,6 +2213,26 @@ document.addEventListener('change',function(e){
   var el=e.target;
   if(el.id==='impSheet'&&el.files&&el.files[0]&&imp){impFile(el.files[0]);return}
   if(el.id==='repPer'){repPer=el.value;return}
+  if(el.id==='scnOk'){try{localStorage.setItem('farmbook.scanok',el.checked?'1':'0')}catch(e){}return}
+  if(el.id==='scnFile'&&el.files&&el.files[0]&&scn){
+    var okc=false;try{okc=localStorage.getItem('farmbook.scanok')==='1'}catch(e){}
+    var cb=document.getElementById('scnOk');if(cb&&cb.checked)okc=true;
+    if(!okc){scn.err='Tick "I understand" first, then choose the photo again.';renderScan();return}
+    try{localStorage.setItem('farmbook.scanok','1')}catch(e){}
+    scanRead(el.files[0]);return;
+  }
+  if(el.dataset&&el.dataset.scn&&scn){
+    var sk=el.dataset.scn,si=+el.dataset.i;
+    if(sk==='date'||sk==='supplier'){scn[sk]=el.value;scnDup();renderScan()}
+    else if(sk==='mode'){scn.mode=el.value}
+    else if(scn.lines[si]){
+      if(sk==='a'){scn.lines[si].a=Math.max(0,Math.round((+el.value||0)*100)/100);scnDup();renderScan()}
+      else if(sk==='d')scn.lines[si].d=el.value;
+      else if(sk==='cat')scn.lines[si].cat=el.value;
+      else if(sk==='sp')scn.lines[si].sp=el.value;
+    }
+    return;
+  }
   if(el.dataset&&el.dataset.imp&&imp){
     var ik=el.dataset.imp;
     if(ik==='kind')imp.kind=el.value;

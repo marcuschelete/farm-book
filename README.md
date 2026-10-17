@@ -1,4 +1,4 @@
-# Farm Book
+# CHELETE Farm Book
 
 A simple app for keeping farm records on your phone: animal numbers, vaccination and dip schedules, feed purchases and spending. It works offline once opened and can be installed on a phone's home screen.
 
@@ -24,6 +24,7 @@ Your records are saved on your own phone only. Use **Backup > Share backup** now
 - Cloud backup with Firebase: sign in with Google or email, automatic backup after changes, restore on any phone (rules in firestore.rules)
 - Export everything to Excel (.xlsx), and make a printable PDF report for any period
 - Import animals or money from Excel, CSV or pasted rows, with column matching, a preview and an undo
+- Scan a receipt or invoice with Gemini (Firebase AI Logic): date, shop and items are read for you to check and correct before saving; shops are remembered
 - Share a backup to WhatsApp, email or Drive, weekly calendar reminder, and restore on any phone
 
 ## Feedback
