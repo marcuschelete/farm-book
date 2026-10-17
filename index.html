@@ -260,7 +260,8 @@ function load(){
   try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.animals)return fix(o)}}catch(e){}
   return seed();
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}}
+function save(){persist();if(typeof cloudDirty==='function')cloudDirty()}
 
 function seed(){
   var t=today(), d=blank(); d.example=true;
@@ -851,6 +852,146 @@ function toast(msg){
   var t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);
   setTimeout(function(){var x=document.getElementById('toast');if(x)x.remove()},4500);
 }
+/* ---------- cloud backup (Firebase) ---------- */
+var FBCFG={apiKey:'AIzaSyAjqHOK7cZ7mo6lsqa0OfjFviXdKfeesyM',authDomain:'cheletefarmbookapp.firebaseapp.com',projectId:'cheletefarmbookapp',appId:'1:177457146945:web:27d92bcc3d68a1c8296ac0'};
+var FBU='https://www.gstatic.com/firebasejs/10.12.2/',CHUNK=200000;
+var cloud={fb:null,initP:null,user:null,meta:undefined,busy:'',err:'',notice:'',linked:false,timer:0};
+try{cloud.linked=localStorage.getItem('farmbook.cloud')==='1'}catch(e){}
+function setLinked(v){cloud.linked=v;try{if(v)localStorage.setItem('farmbook.cloud','1');else localStorage.removeItem('farmbook.cloud')}catch(e){}}
+function getStamp(){try{return +localStorage.getItem('farmbook.cloudstamp')||0}catch(e){return 0}}
+function setStamp(n){try{localStorage.setItem('farmbook.cloudstamp',String(n))}catch(e){}}
+function cloudInit(){
+  if(cloud.fb)return Promise.resolve(cloud.fb);
+  if(cloud.initP)return cloud.initP;
+  cloud.initP=Promise.all([import(FBU+'firebase-app.js'),import(FBU+'firebase-auth.js'),import(FBU+'firebase-firestore.js')]).then(function(m){
+    var app=m[0].initializeApp(FBCFG),f={A:m[1],F:m[2],auth:m[1].getAuth(app),db:m[2].getFirestore(app)};
+    cloud.fb=f;
+    m[1].onAuthStateChanged(f.auth,function(u){cloud.user=u||null;cloud.meta=undefined;if(u){cloudMeta().then(render,render)}else render()});
+    return f;
+  },function(e){cloud.initP=null;throw e});
+  return cloud.initP;
+}
+function cloudErr(e){
+  if(e&&e.msg)return e.msg;
+  var c=e&&e.code||'';
+  var m={'auth/invalid-credential':'Wrong email or password.','auth/wrong-password':'Wrong email or password.','auth/user-not-found':'No account with that email. Tap Create account.','auth/email-already-in-use':'That email already has an account. Tap Sign in.','auth/weak-password':'Use a password of at least 6 characters.','auth/invalid-email':'That email address does not look right.','auth/network-request-failed':'No internet connection. Try again when you have signal.','auth/popup-closed-by-user':'Sign-in was cancelled.','auth/cancelled-popup-request':'Sign-in was cancelled.','auth/operation-not-allowed':'This sign-in method is not switched on yet.','auth/unauthorized-domain':'This website address is not allowed in Firebase yet.','auth/too-many-requests':'Too many tries. Wait a minute and try again.','permission-denied':'The cloud rules refused this. Check the Firestore rules.','unavailable':'Could not reach the cloud. Check your signal.'}[c];
+  return m||(!navigator.onLine?'No internet connection. Try again when you have signal.':'Something went wrong with the cloud ('+(c||'error')+').');
+}
+function cloudRun(label,fn){
+  if(cloud.busy)return;
+  cloud.busy=label;cloud.err='';cloud.notice='';render();
+  return cloudInit().then(fn).then(function(msg){cloud.busy='';render();if(msg)toast(msg)},function(e){cloud.busy='';cloud.err=cloudErr(e);render()});
+}
+function cloudMeta(){
+  var f=cloud.fb,u=cloud.user;if(!f||!u)return Promise.resolve();
+  return f.F.getDoc(f.F.doc(f.db,'users',u.uid)).then(function(s){cloud.meta=s.exists()?s.data():null});
+}
+function chunkText(t){
+  var out=[],i=0;
+  while(i<t.length){var e=Math.min(t.length,i+CHUNK);if(e<t.length){var c=t.charCodeAt(e-1);if(c>=0xD800&&c<=0xDBFF)e--}out.push(t.slice(i,e));i=e}
+  return out.length?out:[''];
+}
+function cloudPush(){
+  var f=cloud.fb,u=cloud.user,F=f&&f.F;
+  if(!f||!u)return Promise.reject({code:'auth/none'});
+  return cloudMeta().then(function(){
+    var txt=JSON.stringify(db),parts=chunkText(txt),old=cloud.meta?cloud.meta.n:0,b=F.writeBatch(f.db),i;
+    for(i=0;i<parts.length;i++)b.set(F.doc(f.db,'users',u.uid,'chunks',String(i)),{i:i,t:parts[i]});
+    for(i=parts.length;i<old;i++)b.delete(F.doc(f.db,'users',u.uid,'chunks',String(i)));
+    var meta={n:parts.length,updated:Date.now(),animals:count(),tx:db.tx.length,bytes:txt.length};
+    b.set(F.doc(f.db,'users',u.uid),meta);
+    return b.commit().then(function(){cloud.meta=meta;setStamp(meta.updated);setLinked(true);db.lastBackup=today();persist()});
+  });
+}
+function cloudPull(){
+  var f=cloud.fb,u=cloud.user,F=f&&f.F;
+  if(!f||!u)return Promise.reject({code:'auth/none'});
+  return cloudMeta().then(function(){
+    if(!cloud.meta)throw {code:'none',msg:'There is no cloud copy yet.'};
+    return F.getDocs(F.collection(f.db,'users',u.uid,'chunks'));
+  }).then(function(snap){
+    var rows=[];snap.forEach(function(d){rows.push(d.data())});
+    rows.sort(function(a,b){return a.i-b.i});
+    if(rows.length!==cloud.meta.n)throw {code:'incomplete',msg:'The cloud copy is incomplete. Try again.'};
+    var o=JSON.parse(rows.map(function(r){return r.t}).join(''));
+    if(!o||!Array.isArray(o.animals)||!Array.isArray(o.tx))throw {code:'bad',msg:'The cloud copy could not be read.'};
+    try{localStorage.setItem('farmbook.prev',JSON.stringify(db))}catch(e){}
+    o=fix(o);o.example=false;o.lastBackup=today();
+    db=o;persist();setStamp(cloud.meta.updated);setLinked(true);
+    return 'Restored '+db.animals.length+' animal records and '+db.tx.length+' transactions from the cloud.';
+  });
+}
+function cloudDelete(){
+  var f=cloud.fb,u=cloud.user,F=f&&f.F;
+  if(!f||!u)return Promise.reject({code:'auth/none'});
+  return cloudMeta().then(function(){
+    var b=F.writeBatch(f.db),n=cloud.meta?cloud.meta.n:0;
+    for(var i=0;i<n;i++)b.delete(F.doc(f.db,'users',u.uid,'chunks',String(i)));
+    b.delete(F.doc(f.db,'users',u.uid));
+    return b.commit();
+  }).then(function(){cloud.meta=null;setStamp(0);setLinked(false);return 'Cloud copy deleted.'});
+}
+/* automatic backup: a short while after the last change, and only once this phone has chosen what to keep */
+function cloudDirty(){
+  if(!cloud.linked||db.example)return;
+  clearTimeout(cloud.timer);cloud.timer=setTimeout(cloudAuto,60000);
+}
+function cloudAuto(){
+  if(!cloud.linked||db.example||cloud.busy||!navigator.onLine)return;
+  cloud.auto=true;
+  cloudInit().then(function(f){return f.auth.authStateReady()}).then(function(){
+    if(!cloud.user)return;
+    return cloudMeta().then(function(){
+      var upd=cloud.meta?cloud.meta.updated:0;
+      if(upd&&upd!==getStamp()){setLinked(false);cloud.notice='The cloud copy was changed from another phone. Choose below which copy to keep.';render();return}
+      return cloudPush().then(function(){if(tab==='more')render()});
+    });
+  }).catch(function(){}).then(function(){cloud.auto=false});
+}
+function when(ms){return new Date(ms).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+function cCloud(){
+  var b=cloud.busy,dis=b?' disabled':'',h='<div class="card"><div class="sec"><h3>Cloud backup</h3>';
+  var signed=!!cloud.user;
+  h+='<span class="pill '+(signed&&cloud.linked?'good':'')+'">'+(signed?(cloud.linked?'Automatic backup on':'Signed in'):'Not signed in')+'</span></div>';
+  if(b)h+='<div class="small muted" role="status">'+esc(b)+'</div>';
+  if(cloud.err)h+='<div class="warnbox" role="alert">'+esc(cloud.err)+'</div>';
+  if(cloud.notice)h+='<div class="warnbox">'+esc(cloud.notice)+'</div>';
+  if(!signed){
+    h+='<div class="small muted">Sign in and your records are saved safely online. You can get them back on any phone. The app still works with no signal.</div>'+
+      '<button class="btn pri" data-a="cgoogle"'+dis+'>Sign in with Google</button>'+
+      '<div class="small muted">Or use an email address:</div>'+
+      '<label class="f">Email<input id="cEmail" type="email" autocomplete="email" inputmode="email"></label>'+
+      '<label class="f">Password<input id="cPass" type="password" autocomplete="current-password"></label>'+
+      '<div class="row"><button class="btn" data-a="cemail" data-m="in" style="flex:1"'+dis+'>Sign in</button><button class="btn" data-a="cemail" data-m="new" style="flex:1"'+dis+'>Create account</button></div>';
+    return h+'</div>';
+  }
+  h+='<div class="small muted">Signed in as '+esc(cloud.user.email||'your account')+'</div>';
+  var m=cloud.meta,local=hasRecords()&&!db.example;
+  if(m===undefined&&!b)h+='<div class="small muted">Checking the cloud copy...</div>';
+  if(m)h+='<div class="small">Cloud copy from '+when(m.updated)+': '+m.animals+' animal records, '+m.tx+' transactions.</div>';
+  if(m===null)h+='<div class="small muted">No cloud copy yet.</div>';
+  if(m!==undefined){
+    if(!cloud.linked){
+      if(m===null){
+        h+=local?'<button class="btn pri" data-a="cpush"'+dis+'>Back up this phone to the cloud</button>':'<div class="small muted">Add some records first, then back them up here.</div>';
+      }else if(!local){
+        h+='<button class="btn pri" data-a="cpull"'+dis+'>Restore from the cloud</button>';
+      }else{
+        h+='<div class="small muted">This phone and the cloud both have records. Choose which to keep. The other is replaced.</div>'+
+          (confirmKey==='cpull'?'<div class="row"><button class="btn bad" data-a="cpull2" style="flex:1"'+dis+'>Yes, replace this phone</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="cpull1"'+dis+'>Use the cloud copy on this phone</button>')+
+          (confirmKey==='cpush'?'<div class="row"><button class="btn bad" data-a="cpush" style="flex:1"'+dis+'>Yes, replace the cloud</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="cpush1"'+dis+'>Use this phone and replace the cloud copy</button>');
+      }
+    }else{
+      h+='<div class="small muted">Changes are saved to the cloud automatically about a minute after you make them, when you have signal.</div>'+
+        '<button class="btn pri" data-a="cpush"'+dis+'>Back up now</button>'+
+        (confirmKey==='cpull'?'<div class="row"><button class="btn bad" data-a="cpull2" style="flex:1"'+dis+'>Yes, replace this phone</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="cpull1"'+dis+'>Restore from the cloud</button>');
+    }
+    if(m)h+=(confirmKey==='cdel'?'<div class="row"><button class="btn bad" data-a="cdelete" style="flex:1"'+dis+'>Yes, delete the cloud copy</button><button class="btn" data-a="cancelc" style="flex:1">Keep</button></div>':'<button class="btn" data-a="cdel1"'+dis+'>Delete the cloud copy</button>');
+  }
+  h+='<button class="btn" data-a="csignout"'+dis+'>Sign out</button>';
+  return h+'</div>';
+}
+
 function backupText(){return JSON.stringify(db)}
 function backupName(){return 'farm-book-backup-'+today()+'.txt'}
 function downloadText(name,text,type){
@@ -880,8 +1021,9 @@ function icsText(){
 function vMore(){
   var due=backupDue();
   var h='<h2>Backup and data</h2>';
-  h+='<div class="card"><h3>Back up your records</h3><div class="row"><span class="pill '+(due?'warn':db.lastBackup?'good':'')+'">'+backupStatus()+'</span></div>'+
-    '<div class="small muted">Your records live only on this phone. Send a backup to yourself on WhatsApp, email or Google Drive, and you can restore it on any phone.</div>'+
+  h+=cCloud();
+  h+='<div class="card"><h3>Share a backup file</h3><div class="row"><span class="pill '+(due?'warn':db.lastBackup?'good':'')+'">'+backupStatus()+'</span></div>'+
+    '<div class="small muted">Another safety copy. Send a backup to yourself on WhatsApp, email or Google Drive, and you can restore it on any phone.</div>'+
     '<button class="btn pri" data-a="share">Share backup</button>'+
     '<div class="row"><button class="btn" data-a="export" style="flex:1">Copy as text</button><button class="btn" data-a="download" style="flex:1">Save to phone</button></div></div>';
   h+='<div class="card"><h3>Remind me to back up</h3><div class="small muted">Adds a weekly reminder to your calendar, so your phone alerts you even when the app is closed.</div>'+
@@ -1308,6 +1450,31 @@ var actions={
   }
   try{downloadText(backupName(),txt,'text/plain');markBackup();toast('Sharing is not available here, so the backup was saved to Downloads. Send that file to yourself.')}catch(e){toast('Could not back up. Try Copy as text.')}
  },
+ cgoogle:function(){
+  cloudRun('Opening Google sign-in...',function(f){
+    var pr=new f.A.GoogleAuthProvider();
+    return f.A.signInWithPopup(f.auth,pr).then(function(){return null},function(e){
+      var c=e&&e.code||'';
+      if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment')return f.A.signInWithRedirect(f.auth,pr).then(function(){return null});
+      throw e;
+    });
+  });
+ },
+ cemail:function(d){
+  var em=(document.getElementById('cEmail')||{}).value||'',pw=(document.getElementById('cPass')||{}).value||'';
+  em=em.trim();if(!em||!pw){toast('Enter your email and password.');return}
+  cloudRun(d.m==='new'?'Creating your account...':'Signing in...',function(f){
+    return (d.m==='new'?f.A.createUserWithEmailAndPassword(f.auth,em,pw):f.A.signInWithEmailAndPassword(f.auth,em,pw)).then(function(){return null});
+  });
+ },
+ csignout:function(){cloudRun('Signing out...',function(f){return f.A.signOut(f.auth).then(function(){setLinked(false);cloud.meta=undefined;return 'Signed out.'})})},
+ cpush1:function(){confirmKey='cpush';render()},
+ cpush:function(){confirmKey=null;cloudRun('Backing up...',function(){return cloudPush().then(function(){return 'Backed up to the cloud.'})})},
+ cpull1:function(){if(hasRecords()&&!db.example){confirmKey='cpull';render()}else actions.cpull2()},
+ cpull2:function(){confirmKey=null;cloudRun('Restoring...',function(){return cloudPull()})},
+ cpull:function(){actions.cpull1()},
+ cdel1:function(){confirmKey='cdel';render()},
+ cdelete:function(){confirmKey=null;cloudRun('Deleting...',function(){return cloudDelete()})},
  ics:function(){try{downloadText('farm-book-reminder.ics',icsText(),'text/calendar');toast('Open the downloaded file to add the reminder to your calendar.')}catch(e){toast('Not available here. Use the Google Calendar button.')}},
  import:function(){var el=document.getElementById('impTxt');if(!el||!el.value.trim()){toast('Paste a backup first, or choose a file.');return}doImport(el.value)}
 };
@@ -1341,6 +1508,8 @@ document.addEventListener('pointermove',function(e){var sv=e.target&&e.target.cl
 document.addEventListener('pointerdown',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 try{var mq=window.matchMedia('(min-width: 900px)');var onmq=function(){render()};if(mq.addEventListener)mq.addEventListener('change',onmq);else if(mq.addListener)mq.addListener(onmq)}catch(e){}
 function notifyRecurring(n){if(n&&!db.example){render();toast('Added '+n+' repeating cost'+(n>1?'s':'')+' to Money.')}}
+window.addEventListener('online',function(){if(cloud.linked)cloudAuto()});
+setTimeout(function(){if(cloud.linked)cloudInit().then(function(){cloudAuto()},function(){})},2500);
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&db){var n=runRecurring();if(n){if(db.example)render();else notifyRecurring(n)}}});
 
 db=load();

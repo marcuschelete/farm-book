@@ -21,6 +21,7 @@ Your records are saved on your own phone only. Use **Backup > Share backup** now
 - Profit per animal type, and a line chart of animal numbers over time
 - On a laptop or tablet the app shows a fuller dashboard automatically; the phone layout stays simple
 - Edit or remove any entry
+- Cloud backup with Firebase: sign in with Google or email, automatic backup after changes, restore on any phone (rules in firestore.rules)
 - Share a backup to WhatsApp, email or Drive, weekly calendar reminder, and restore on any phone
 
 ## Feedback
