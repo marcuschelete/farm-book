@@ -16,6 +16,10 @@ Your records are saved on your own phone only. Use **Backup > Share backup** now
 - Feed purchases with an early/late rhythm check
 - Spending by category, sales and net per month, with repeating costs (wages, feed) added automatically
 - Calendar showing money in and out for each day, with due treatments marked
+- Every income and cost can be tagged to an animal type, and to the specific tagged animals (a sold animal, or the cows a batch of milk came from)
+- Pie charts of spending by category and income by animal type; tap a slice for a breakdown
+- Profit per animal type, and a line chart of animal numbers over time
+- On a laptop or tablet the app shows a fuller dashboard automatically; the phone layout stays simple
 - Edit or remove any entry
 - Share a backup to WhatsApp, email or Drive, weekly calendar reminder, and restore on any phone
 

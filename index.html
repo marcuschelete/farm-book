@@ -111,6 +111,83 @@ pre.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;pad
 .day:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rm{display:flex;flex-direction:column;gap:8px;margin-top:4px}
 .rm .row{width:100%}
+/* ---- charts and analytics ---- */
+:root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;--s8:#e34948}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767}}
+:root[data-theme="dark"]{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767}
+.pie{display:flex;flex-direction:column;gap:12px;align-items:stretch}
+.donut{width:100%;max-width:220px;align-self:center;display:block}
+.donut text{fill:var(--muted);font:600 9px var(--body)}
+.donut text.big{fill:var(--fg);font:700 15px var(--display)}
+.slice{cursor:pointer;outline:none}
+.slice:hover,.slice:focus-visible{stroke-opacity:.8}
+.legend{display:flex;flex-direction:column}
+.lrow{display:flex;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--fg);font:inherit;padding:8px 2px;cursor:pointer;text-align:left;width:100%;min-width:0}
+.lrow:first-child{border-top:0}
+.lrow .ln{flex:1;min-width:0;overflow-wrap:anywhere}
+.lrow .lp{color:var(--muted);min-width:3.2em;text-align:right;font-size:.875rem}
+.lrow.off{opacity:.45}
+.lrow.off .ln{text-decoration:line-through}
+.lrow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;flex:none}
+.sw.inl{margin-right:8px;vertical-align:-1px}
+.hb{display:flex;flex-direction:column;gap:4px}
+.hbt{display:flex;justify-content:space-between;gap:10px;font-size:.9rem}
+.hbt span:first-child{overflow-wrap:anywhere;min-width:0}
+.hb .track{background:var(--soft);border-radius:5px;height:10px}
+.hb .track i{display:block;height:10px;border-radius:5px;background:var(--accent);min-width:2px}
+.chartwrap{position:relative}
+.chart{width:100%;height:auto;display:block;touch-action:pan-y}
+.chart text{fill:var(--muted);font:11px var(--body)}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ax{stroke:var(--line);stroke-width:1}
+.chart .xhair{stroke:var(--muted);stroke-width:1}
+.chart .hit{fill:transparent}
+.chart .hit:hover{fill:var(--soft);opacity:.5}
+.tip{position:absolute;top:6px;pointer-events:none;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.85rem;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:3;white-space:nowrap}
+.tip .tk{display:flex;gap:8px;align-items:center}
+.tip .tk i{display:inline-block;width:14px;border-top:2px solid}
+.keys{display:flex;gap:12px;font-size:.85rem;color:var(--muted)}
+.keys .sw{margin-right:4px;vertical-align:-1px}
+.tw{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:.9rem}
+table.t th,table.t td{padding:8px 10px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+table.t thead th{border-top:0;color:var(--muted);font-weight:600;font-size:.8rem;white-space:nowrap}
+table.t tfoot td{font-weight:700;border-top:2px solid var(--line)}
+table.t .r{text-align:right}
+table.t tr.clk{cursor:pointer}
+table.t tr.clk:hover{background:var(--soft)}
+.sh,.lnk{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:inherit}
+.sh{font-weight:600}
+.lnk{font-weight:600;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.sh:focus-visible,.lnk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.picks{display:flex;flex-wrap:wrap;gap:6px}
+.pick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:6px 12px;cursor:pointer;font-weight:600;font-size:.9rem}
+.pick input{width:auto;min-height:0;margin:0}
+.pick:has(input:checked){background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.fgroup{display:flex;flex-direction:column;gap:6px}
+.fl{font-weight:600;font-size:.9rem}.fl small{font-weight:400;color:var(--muted)}
+.nav .brand{display:none}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;align-items:start}
+.dash>.s4{grid-column:span 4}.dash>.s5{grid-column:span 5}.dash>.s6{grid-column:span 6}.dash>.s7{grid-column:span 7}.dash>.s8{grid-column:span 8}.dash>.s12{grid-column:span 12}
+.dash>*>.card{height:100%}
+@media (min-width:900px){
+  body.wide{padding-left:196px;padding-right:24px;padding-block:20px 40px}
+  body.wide .wrap{max-width:1180px;gap:18px}
+  body.wide .narrow{max-width:720px;display:flex;flex-direction:column;gap:16px}
+  body.wide .nav{top:0;right:auto;bottom:0;width:172px;flex-direction:column;justify-content:flex-start;border-top:0;border-right:1px solid var(--line);padding:18px 10px}
+  body.wide .nav #nav{flex-direction:column;max-width:none;gap:4px}
+  body.wide .nav .brand{display:block;font:700 1.25rem var(--display);padding:4px 10px 16px;color:var(--accent);flex:none}
+  body.wide .nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;font-size:.95rem}
+  body.wide .scrim{align-items:center}
+  body.wide .sheet{max-width:560px;border-radius:16px;max-height:88%}
+  body.wide .toast{bottom:28px}
+  .pie{flex-direction:row;align-items:center}
+  .pie .donut{width:190px;max-width:190px;flex:none;align-self:center}
+  .pie .legend{flex:1;min-width:0}
+}
 </style>
 </head>
 <body>
@@ -125,10 +202,15 @@ var KEY='farmbook.v1';
 var SPECIES=['Cattle','Goats','Sheep','Chickens','Other'];
 var TYPES=['Vaccine','Dewormer','Dip / tick','Spray','Medicine'];
 var OUTCATS=['Feed','Health','Animals','Equipment','Labour','Other'];
-var INCATS=['Sales','Other'];
+var INCATS=['Animal sales','Eggs','Milk','Other'];
 var EVT={bought:'Bought',born:'Born',existing:'Already on the farm',sold:'Sold',eaten:'Eaten at home',died:'Died'};
 var FREQ={monthly:'Every month',fortnightly:'Every 2 weeks',weekly:'Every week'};
 var SRC={born:'born here',bought:'bought',existing:'on the farm'};
+var SPCOL={Cattle:'--s1',Goats:'--s2',Sheep:'--s3',Chickens:'--s4',Other:'--s5','':'--muted'};
+var NEEDSP=['Animal sales','Eggs','Milk'];
+var POPR={'3m':91,'1y':365,'all':0};
+var SORT={animals:{k:'tag',d:1},tx:{k:'date',d:-1}};
+var splitShared=false,popRange='1y',popHide={};
 var db, tab='home', cur=null, flt='All', showPast=false, period='month', confirmKey=null, calMonth='', calDay='';
 
 function p2(n){return (n<10?'0':'')+n}
@@ -156,6 +238,22 @@ function fix(o){
     if(!a.kind)a.kind=(a.qty===1&&a.tag)?'individual':'group';
     if(a.kind==='individual'){a.qty=1;a.motherId=a.motherId||'';a.fatherId=a.fatherId||'';if(!a.sex||a.sex==='Mixed')a.sex='Unknown'}
   });
+  var pn=function(id){var p=o.products.filter(function(x){return x.id===id})[0];return p?p.name:''};
+  o.treatments.forEach(function(t){
+    if(!t.txId&&t.cost){var m=o.tx.filter(function(y){return y.dir==='out'&&y.cat==='Health'&&y.amount===t.cost&&y.date===t.date&&y.item===pn(t.productId)})[0];if(m)t.txId=m.id}
+  });
+  var byTx={};o.treatments.forEach(function(t){if(t.txId)byTx[t.txId]=t});
+  o.tx.forEach(function(x){
+    if(x.dir==='in'&&x.cat==='Sales')x.cat='Animal sales';
+    if(!Array.isArray(x.animalIds))x.animalIds=[];
+    if(typeof x.species!=='string'){
+      var sp='',t=byTx[x.id];
+      if(t&&t.target&&t.target!=='All')sp=t.target;
+      if(!sp&&(x.dir==='in'||x.cat==='Animals'||x.cat==='Feed'||x.cat==='Health'))sp=guessSpecies((x.item||'')+' '+(x.note||''));
+      x.species=sp;
+    }
+  });
+  o.recurring.forEach(function(r){if(typeof r.species!=='string')r.species='';if(!Array.isArray(r.animalIds))r.animalIds=[]});
   return o;
 }
 function load(){
@@ -184,16 +282,24 @@ function seed(){
   d.treatments.push({id:uid(),date:addDays(t,-17),productId:dip.id,target:'Cattle',dose:'Full dip tank',cost:0,note:'',withdrawal:7});
   d.treatments.push({id:uid(),date:addDays(t,-60),productId:iver.id,target:'Goats',dose:'1 ml per 50 kg',cost:0,note:'',withdrawal:28});
   d.treatments.push({id:uid(),date:addDays(t,-170),productId:fmd.id,target:'Cattle',dose:'2 ml per head',cost:0,note:'',withdrawal:0});
-  function tx(dir,days,cat,amt,item,sup){d.tx.push({id:uid(),date:addDays(t,days),dir:dir,cat:cat,amount:amt,item:item,supplier:sup||'',note:''})}
-  tx('out',-70,'Feed',1850,'Lucerne bales','Feed store');tx('out',-48,'Feed',1900,'Lucerne bales','Feed store');tx('out',-26,'Feed',1820,'Mixed feed','Feed store');tx('out',-14,'Feed',1200,'Layer mash','Feed store');
-  tx('out',-12,'Health',640,'Vaccines and dip','Vet shop');tx('out',-40,'Health',480,'Dewormer','Vet shop');tx('out',-33,'Animals',2600,'3 goats','Neighbour');
-  tx('in',-20,'Sales',3200,'2 goats sold','');tx('out',-5,'Labour',400,'Fence repair','');
+  function tx(dir,days,cat,amt,item,sup,sp){d.tx.push({id:uid(),date:addDays(t,days),dir:dir,cat:cat,amount:amt,item:item,supplier:sup||'',note:'',species:sp||'',animalIds:[]})}
+  tx('out',-70,'Feed',1850,'Lucerne bales','Feed store','Goats');tx('out',-48,'Feed',1900,'Lucerne bales','Feed store','Cattle');tx('out',-26,'Feed',1820,'Mixed feed','Feed store');tx('out',-14,'Feed',1200,'Layer mash','Feed store','Chickens');
+  tx('out',-12,'Health',640,'Vaccines and dip','Vet shop','Cattle');tx('out',-40,'Health',480,'Dewormer','Vet shop','Goats');tx('out',-33,'Animals',2600,'3 goats','Neighbour','Goats');
+  tx('in',-20,'Animal sales',3200,'2 goats sold','','Goats');tx('out',-5,'Labour',400,'Fence repair','');
+  tx('in',-9,'Eggs',540,'Eggs, 12 trays','Market','Chickens');tx('in',-3,'Eggs',480,'Eggs, 10 trays','Market','Chickens');tx('in',-8,'Milk',380,'Cow milk','Dairy','Cattle');
+  d.tx.push({id:uid(),date:addDays(t,-6),dir:'in',cat:'Milk',amount:260,item:'Goat milk',supplier:'Neighbour',note:'',species:'Goats',animalIds:[dam.id]});
   var rs=addDays(t,-65);
   d.recurring.push({id:uid(),dir:'out',cat:'Labour',amount:1500,item:'Farm hand wages',supplier:'',freq:'monthly',start:rs,dom:+rs.slice(8),lastGen:null,active:true});
   d.stock.push({id:uid(),date:addDays(t,-70),type:'born',species:'Goats',qty:9,who:'',price:0,note:'Kids 2026'});
   d.stock.push({id:uid(),date:addDays(t,-70),type:'born',species:'Goats',qty:1,who:'',price:0,note:'G-4567'});
   d.stock.push({id:uid(),date:addDays(t,-33),type:'bought',species:'Goats',qty:3,who:'Neighbour',price:2600,note:''});
   d.stock.push({id:uid(),date:addDays(t,-20),type:'sold',species:'Goats',qty:2,who:'Local buyer',price:3200,note:''});
+  d.stock.push({id:uid(),date:addDays(t,-200),type:'bought',species:'Sheep',qty:5,who:'Neighbour',price:0,note:''});
+  d.stock.push({id:uid(),date:addDays(t,-120),type:'died',species:'Sheep',qty:1,who:'',price:0,note:''});
+  d.stock.push({id:uid(),date:addDays(t,-90),type:'born',species:'Chickens',qty:15,who:'',price:0,note:'Hatched'});
+  d.stock.push({id:uid(),date:addDays(t,-30),type:'died',species:'Chickens',qty:3,who:'',price:0,note:''});
+  d.stock.push({id:uid(),date:addDays(t,-150),type:'born',species:'Cattle',qty:2,who:'',price:0,note:'Calves'});
+  d.stock.push({id:uid(),date:addDays(t,-45),type:'sold',species:'Cattle',qty:1,who:'Butcher',price:0,note:''});
   return d;
 }
 
@@ -302,7 +408,7 @@ function runRecurring(){
       var dup=db.tx.some(function(x){return x.recId===r.id&&x.date===d});
       r.lastGen=d;
       if(dup)continue;
-      db.tx.push({id:uid(),date:d,dir:'out',cat:r.cat,amount:r.amount,item:r.item,supplier:r.supplier||'',note:'',recId:r.id});n++;
+      db.tx.push({id:uid(),date:d,dir:'out',cat:r.cat,amount:r.amount,item:r.item,supplier:r.supplier||'',note:'',recId:r.id,species:r.species||'',animalIds:(r.animalIds||[]).slice()});n++;
     }
   });
   if(n)save();
@@ -316,11 +422,12 @@ function linkLegacy(t){
   var m=db.tx.find(function(y){return y.dir==='out'&&y.cat==='Health'&&y.amount===t.cost&&y.date===t.date&&y.item===pn});
   if(m)t.txId=m.id;
 }
+function txScope(t){return {species:(t.target&&t.target!=='All')?t.target:'',animalIds:t.animalId?[t.animalId]:[]}}
 function syncTreatCost(t,cost,name){
-  var x=t.txId?db.tx.find(function(y){return y.id===t.txId}):null;
+  var x=t.txId?db.tx.find(function(y){return y.id===t.txId}):null,sc=txScope(t);
   if(cost>0){
-    if(x){x.amount=cost;x.date=t.date;x.item=name}
-    else if(cost!==(t.cost||0)||!t.cost){var id=uid();db.tx.push({id:id,date:t.date,dir:'out',cat:'Health',amount:cost,item:name,supplier:'',note:''});t.txId=id}
+    if(x){x.amount=cost;x.date=t.date;x.item=name;x.species=sc.species;x.animalIds=sc.animalIds}
+    else if(cost!==(t.cost||0)||!t.cost){var id=uid();db.tx.push({id:id,date:t.date,dir:'out',cat:'Health',amount:cost,item:name,supplier:'',note:'',species:sc.species,animalIds:sc.animalIds});t.txId=id}
   }else if(x){db.tx=db.tx.filter(function(y){return y!==x});t.txId=''}
   t.cost=cost;
 }
@@ -340,40 +447,300 @@ var IC={
 };
 var TABS=[['home','Home','home'],['animals','Animals','paw'],['health','Health','health'],['money','Money','money'],['more','Backup','more']];
 
+/* ---------- analytics ---------- */
+var PERIODS={month:'This month',last:'Last month',year:'This year',all:'All time'};
+function periodTx(per){return db.tx.filter(function(x){return inPeriod(x.date,per)})}
+function pct(p){var n=Math.round(p*100);return (p>0&&n<1)?'<1%':n+'%'}
+function num2(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+function moneyC(n){return Math.abs(n)>=100000?'P '+(n<0?'-':'')+cmp(n):money(n)}
+function spColor(sp){return SPCOL[sp||'']||'--muted'}
+function spName(sp){return sp||'Not specified'}
+function catColor(c){var i=OUTCATS.indexOf(c);return '--s'+(i<0?6:i+1)}
+function r1(n){return Math.round(n*10)/10}
+function niceMax(n){
+  if(!(n>0))return 1;
+  var p=Math.pow(10,Math.floor(Math.log(n)/Math.LN10)),m=n/p,steps=[1,1.2,1.5,2,2.5,3,4,5,6,8,10],f=10;
+  for(var i=0;i<steps.length;i++){if(m<=steps[i]+1e-9){f=steps[i];break}}
+  return Math.max(1,Math.ceil(f*p-1e-9));
+}
+function isWide(){try{return !!(window.matchMedia&&window.matchMedia('(min-width: 900px)').matches)}catch(e){return false}}
+function guessSpecies(s){
+  s=String(s||'').toLowerCase();
+  if(/\b(goats?|kids?|nanny|billy)\b/.test(s))return 'Goats';
+  if(/\b(sheep|lambs?|rams?|ewes?)\b/.test(s))return 'Sheep';
+  if(/\b(cattle|cows?|bulls?|oxen|ox|calf|calves|heifers?|steers?)\b/.test(s))return 'Cattle';
+  if(/\b(chickens?|hens?|layers?|broilers?|eggs?|roosters?|birds?|chicks?)\b/.test(s))return 'Chickens';
+  return '';
+}
+function groupSum(txs,keyf){
+  var m={};txs.forEach(function(x){var k=keyf(x);m[k]=(m[k]||0)+x.amount});
+  return Object.keys(m).map(function(k){return {k:k,v:m[k]}}).sort(function(a,b){return b.v-a.v});
+}
+function hbars(rows,total,colorf){
+  return '<div class="stack">'+rows.map(function(r){
+    var p=total>0?r.v/total:0;
+    return '<div class="hb"><div class="hbt"><span>'+esc(r.label)+'</span><span class="num">'+money(r.v)+' · '+pct(p)+'</span></div><div class="track"><i style="width:'+Math.max(2,Math.round(p*100))+'%'+(colorf?';background:var('+colorf(r)+')':'')+'"></i></div></div>';
+  }).join('')+'</div>';
+}
+function profitData(per,split){
+  var inc={},cost={},shared=0,tin=0,tout=0;
+  periodTx(per).forEach(function(x){
+    var k=x.species||'';
+    if(x.dir==='in'){inc[k]=(inc[k]||0)+x.amount;tin+=x.amount}
+    else{tout+=x.amount;if(k)cost[k]=(cost[k]||0)+x.amount;else shared+=x.amount}
+  });
+  var heads=count(),alloc=split&&heads>0;
+  var rows=SPECIES.filter(function(sp){return inc[sp]||cost[sp]||(alloc&&count(sp)>0)}).map(function(sp){
+    var share=alloc?shared*count(sp)/heads:0,c=(cost[sp]||0)+share,i=inc[sp]||0;
+    return {sp:sp,inc:i,cost:c,own:cost[sp]||0,share:share,profit:i-c};
+  });
+  return {rows:rows,shared:alloc?0:shared,sharedAll:shared,unspec:inc['']||0,tin:tin,tout:tout,alloc:alloc};
+}
+function attrib(id){
+  var e=0,s=0;
+  db.tx.forEach(function(x){var ids=x.animalIds||[];if(ids.indexOf(id)<0)return;var sh=x.amount/ids.length;if(x.dir==='in')e+=sh;else s+=sh});
+  return {earned:e,spent:s};
+}
+
+/* ---------- charts ---------- */
+function pieHtml(kind,slices,total,center){
+  var R=52,W=24,C=2*Math.PI*R,acc=0,cs='';
+  slices.forEach(function(s){
+    var f=s.value/total,len=f*C,gap=slices.length>1?2:0,dl=Math.max(len-gap,0.6);
+    cs+='<circle class="slice" cx="70" cy="70" r="'+R+'" fill="none" style="stroke:var('+s.color+')" stroke-width="'+W+'" stroke-dasharray="'+dl.toFixed(2)+' '+(C-dl).toFixed(2)+'" stroke-dashoffset="'+(-acc).toFixed(2)+'" transform="rotate(-90 70 70)" data-a="slice" data-k="'+kind+'" data-v="'+esc(s.key)+'" tabindex="0" role="button" aria-label="'+esc(s.label)+': '+money(s.value)+', '+pct(f)+'"><title>'+esc(s.label)+' · '+money(s.value)+' · '+pct(f)+'</title></circle>';
+    acc+=len;
+  });
+  var svg='<svg class="donut" viewBox="0 0 140 140" role="img" aria-label="Chart of '+esc(center)+' by '+(kind==='exp'?'category':'animal type')+'">'+cs+'<text x="70" y="69" text-anchor="middle" class="big">'+esc(moneyC(total))+'</text><text x="70" y="85" text-anchor="middle">'+esc(center)+'</text></svg>';
+  var leg='<div class="legend">'+slices.map(function(s){
+    return '<button class="lrow" data-a="slice" data-k="'+kind+'" data-v="'+esc(s.key)+'"><i class="sw" style="background:var('+s.color+')"></i><span class="ln">'+esc(s.label)+'</span><span class="num">'+money(s.value)+'</span><span class="lp num">'+pct(s.value/total)+'</span></button>';
+  }).join('')+'</div>';
+  return '<div class="pie">'+svg+leg+'</div>';
+}
+function cExpPie(){
+  var T=totals(period),cats=OUTCATS.filter(function(c){return T.out[c]>0}).sort(function(a,b){return T.out[b]-T.out[a]});
+  var sl=cats.map(function(c){return {key:c,label:c,value:T.out[c],color:catColor(c)}});
+  return '<div class="card"><div class="sec"><h2>Spending by category</h2><span class="muted small">'+PERIODS[period]+'</span></div>'+
+    (sl.length?pieHtml('exp',sl,T.tout,'spent')+'<div class="small muted">Tap a slice or a name for the breakdown.</div>':'<div class="empty">No spending in this period.</div>')+'</div>';
+}
+function cIncPie(){
+  var m={};periodTx(period).forEach(function(x){if(x.dir==='in'){var k=x.species||'';m[k]=(m[k]||0)+x.amount}});
+  var keys=Object.keys(m).sort(function(a,b){return m[b]-m[a]}),tot=keys.reduce(function(s,k){return s+m[k]},0);
+  var sl=keys.map(function(k){return {key:k,label:spName(k),value:m[k],color:spColor(k)}});
+  return '<div class="card"><div class="sec"><h2>Income by animal type</h2><span class="muted small">'+PERIODS[period]+'</span></div>'+
+    (sl.length?pieHtml('inc',sl,tot,'earned')+'<div class="small muted">Tap a slice or a name to see where it came from.</div>':'<div class="empty">No income in this period.</div>')+'</div>';
+}
+
+function th(tbl,k,label,right){
+  var s=SORT[tbl],on=s.k===k;
+  return '<th'+(right?' class="r"':'')+' aria-sort="'+(on?(s.d>0?'ascending':'descending'):'none')+'"><button class="sh" data-a="sort" data-t="'+tbl+'" data-k="'+k+'">'+label+(on?(s.d>0?' &#9650;':' &#9660;'):'')+'</button></th>';
+}
+function sortBy(rows,tbl,getters){
+  var s=SORT[tbl],g=getters[s.k]||getters[Object.keys(getters)[0]];
+  return rows.slice().sort(function(a,b){var x=g(a),y=g(b);return (x<y?-1:x>y?1:0)*s.d});
+}
+function periodChips(){return '<div class="chips">'+Object.keys(PERIODS).map(function(k){return '<button class="chip" aria-pressed="'+(period===k)+'" data-a="period" data-v="'+k+'">'+PERIODS[k]+'</button>'}).join('')+'</div>'}
+
+function cProfit(){
+  var pd=profitData(period,splitShared),rows='';
+  function colr(v){return 'style="color:var(--'+(v<0?'bad':'good')+')"'}
+  pd.rows.forEach(function(r){
+    rows+='<tr class="clk" data-a="slice" data-k="inc" data-v="'+esc(r.sp)+'"><td><i class="sw inl" style="background:var('+spColor(r.sp)+')"></i><button class="lnk" data-a="slice" data-k="inc" data-v="'+esc(r.sp)+'">'+esc(r.sp)+'</button></td><td class="r num">'+num2(r.inc)+'</td><td class="r num">'+num2(r.cost)+'</td><td class="r num" '+colr(r.profit)+'><b>'+num2(r.profit)+'</b></td></tr>';
+  });
+  if(pd.shared>0)rows+='<tr><td class="muted">Shared farm costs</td><td class="r num">0</td><td class="r num">'+num2(pd.shared)+'</td><td class="r num" '+colr(-pd.shared)+'><b>'+num2(-pd.shared)+'</b></td></tr>';
+  if(pd.unspec>0)rows+='<tr><td class="muted">Income not tied to a type</td><td class="r num">'+num2(pd.unspec)+'</td><td class="r num">0</td><td class="r num" '+colr(pd.unspec)+'><b>'+num2(pd.unspec)+'</b></td></tr>';
+  var net=pd.tin-pd.tout,has=pd.rows.length||pd.shared>0||pd.unspec>0;
+  return '<div class="card"><div class="sec"><h2>Profit per animal type</h2><span class="muted small">'+PERIODS[period]+' · P</span></div>'+
+    (has?'<div class="tw"><table class="t"><thead><tr><th>Type</th><th class="r">Income</th><th class="r">Costs</th><th class="r">Profit</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td>Total</td><td class="r num">'+num2(pd.tin)+'</td><td class="r num">'+num2(pd.tout)+'</td><td class="r num" '+colr(net)+'>'+num2(net)+'</td></tr></tfoot></table></div>':'<div class="empty">Record income and costs against an animal type and the profit for each shows here.</div>')+
+    '<div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="chip" aria-pressed="'+splitShared+'" data-a="split">Split shared costs by number of animals</button></div>'+
+    '<div class="small muted">Costs count against a type when you choose that type on the entry. Feed for goats, vet costs for cattle and animal purchases do this automatically.</div></div>';
+}
+
+/* animal numbers over time */
+var EVD={bought:1,born:1,existing:1,sold:-1,eaten:-1,died:-1};
+var popGeo=null;
+function popData(){
+  var t=today(),days=POPR[popRange];
+  var evs=db.stock.filter(function(e){return EVD[e.type]!==undefined&&e.date<=t});
+  var dates=evs.map(function(e){return e.date}).sort();
+  var rs=days?addDays(t,-days):(dates.length?dates[0]:addDays(t,-30));
+  if(diff(rs,t)<14)rs=addDays(t,-14);
+  var series=[];
+  SPECIES.forEach(function(sp){
+    var se=evs.filter(function(e){return e.species===sp}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+    var cur=count(sp);if(!cur&&!se.length)return;
+    var net=se.reduce(function(s,e){return s+EVD[e.type]*e.qty},0),run=Math.max(0,cur-net),v0=run,pts=[];
+    se.forEach(function(e){
+      run=Math.max(0,run+EVD[e.type]*e.qty);
+      if(e.date<=rs){v0=run;return}
+      var last=pts[pts.length-1];
+      if(last&&last.d===e.date)last.v=run;else pts.push({d:e.date,v:run});
+    });
+    pts.unshift({d:rs,v:v0});
+    var lp=pts[pts.length-1];
+    if(lp.d===t)lp.v=cur;else pts.push({d:t,v:cur});
+    if(!pts.some(function(p){return p.v>0}))return;
+    series.push({sp:sp,pts:pts,start:v0,now:cur});
+  });
+  return {rs:rs,t:t,series:series};
+}
+function valueAt(s,d){var v=s.pts[0].v;for(var i=0;i<s.pts.length;i++){if(s.pts[i].d<=d)v=s.pts[i].v;else break}return v}
+function popChart(pd,vis){
+  var w=isWide(),W=w?620:340,H=w?250:220,L=32,R=12,T=12,B=24;
+  var span=Math.max(1,diff(pd.rs,pd.t)),mx=1;
+  vis.forEach(function(s){s.pts.forEach(function(p){if(p.v>mx)mx=p.v})});
+  var ym=niceMax(mx);
+  function X(d){return r1(L+diff(pd.rs,d)/span*(W-L-R))}
+  function Y(v){return r1(T+(1-v/ym)*(H-T-B))}
+  var g='',ticks=[0];
+  if(ym>=4&&ym%2===0)ticks.push(ym/2);
+  ticks.push(ym);
+  ticks.forEach(function(v){g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text x="'+(L-6)+'" y="'+(Y(v)+3.5)+'" text-anchor="end">'+v+'</text>'});
+  var mid=addDays(pd.rs,Math.round(span/2));
+  g+='<text x="'+L+'" y="'+(H-6)+'" text-anchor="start">'+dshort(pd.rs)+'</text><text x="'+X(mid)+'" y="'+(H-6)+'" text-anchor="middle">'+dshort(mid)+'</text><text x="'+(W-R)+'" y="'+(H-6)+'" text-anchor="end">'+dshort(pd.t)+'</text>';
+  vis.forEach(function(s){
+    var d='M'+X(s.pts[0].d)+' '+Y(s.pts[0].v);
+    for(var i=1;i<s.pts.length;i++)d+=' H'+X(s.pts[i].d)+' V'+Y(s.pts[i].v);
+    g+='<path d="'+d+'" fill="none" style="stroke:var('+spColor(s.sp)+')" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  });
+  vis.forEach(function(s){
+    var p=s.pts[s.pts.length-1];
+    g+='<circle cx="'+X(p.d)+'" cy="'+Y(p.v)+'" r="4" stroke-width="2" style="fill:var('+spColor(s.sp)+');stroke:var(--surface)"/>';
+  });
+  popGeo={W:W,L:L,R:R,rs:pd.rs,t:pd.t,series:vis};
+  return '<div class="chartwrap"><svg class="chart popsvg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Animal numbers over time, one line per animal type">'+g+'<line class="xhair" y1="'+T+'" y2="'+(H-B)+'" style="display:none"/></svg><div class="tip" style="display:none"></div></div>';
+}
+function cPop(){
+  var pd=popData(),vis=pd.series.filter(function(s){return !popHide[s.sp]});
+  var rng=[['3m','3 months'],['1y','1 year'],['all','All time']];
+  var h='<div class="card"><div class="sec"><h2>Animal numbers over time</h2><div class="chips">'+rng.map(function(r){return '<button class="chip" aria-pressed="'+(popRange===r[0])+'" data-a="poprange" data-v="'+r[0]+'">'+r[1]+'</button>'}).join('')+'</div></div>';
+  if(!pd.series.length){popGeo=null;return h+'<div class="empty">Add animals and record births, purchases and sales to see how your numbers change.</div></div>'}
+  if(vis.length)h+=popChart(pd,vis);else{popGeo=null;h+='<div class="empty">All lines are hidden. Tap a name below to show it again.</div>'}
+  h+='<div class="legend">'+pd.series.map(function(s){
+    var d=s.now-s.start;
+    return '<button class="lrow'+(popHide[s.sp]?' off':'')+'" data-a="poptog" data-v="'+s.sp+'" aria-pressed="'+(!popHide[s.sp])+'"><i class="sw" style="background:var('+spColor(s.sp)+')"></i><span class="ln">'+s.sp+'</span><span class="num">'+s.now+' now</span><span class="lp num">'+(d>0?'+':d<0?'-':'')+Math.abs(d)+' since '+dshort(pd.rs)+'</span></button>';
+  }).join('')+'</div><div class="small muted">Tap a name to hide or show its line. Touch or hover the chart to read the numbers on a date.</div></div>';
+  return h;
+}
+function popHover(svg,e){
+  var g=popGeo;if(!g)return;
+  var r=svg.getBoundingClientRect();if(!r.width)return;
+  var vx=(e.clientX-r.left)/r.width*g.W,span=Math.max(1,diff(g.rs,g.t));
+  var off=Math.max(0,Math.min(span,Math.round((vx-g.L)/(g.W-g.L-g.R)*span)));
+  var d=addDays(g.rs,off),x=g.L+off/span*(g.W-g.L-g.R);
+  var wrap=svg.parentNode,xh=svg.querySelector('.xhair'),tip=wrap.querySelector('.tip');
+  xh.setAttribute('x1',x);xh.setAttribute('x2',x);xh.style.display='';
+  tip.innerHTML='<div class="muted">'+dshort(d)+'</div>'+g.series.map(function(s){return '<div class="tk"><i style="border-color:var('+spColor(s.sp)+')"></i><b class="num">'+valueAt(s,d)+'</b><span>'+esc(s.sp)+'</span></div>'}).join('');
+  tip.style.display='block';
+  var px=x/g.W*r.width;
+  tip.style.left=(px>r.width*0.55?Math.max(0,px-tip.offsetWidth-10):px+10)+'px';
+}
+function popOut(){
+  var a=document.querySelectorAll('.popsvg .xhair');for(var i=0;i<a.length;i++)a[i].style.display='none';
+  var b=document.querySelectorAll('.chartwrap .tip');for(var j=0;j<b.length;j++)b[j].style.display='none';
+}
+
+/* income and spending, last 12 months */
+function monthsBack(n){
+  var t=today(),y=+t.slice(0,4),m=+t.slice(5,7),out=[];
+  for(var i=n-1;i>=0;i--){var mm=m-i,yy=y;while(mm<=0){mm+=12;yy--}out.push(yy+'-'+p2(mm))}
+  return out;
+}
+function barPath(x,y,w,h,r){
+  r=Math.min(r,h,w/2);
+  return 'M'+x+' '+(y+h)+' V'+(y+r)+' Q'+x+' '+y+' '+(x+r)+' '+y+' H'+(x+w-r)+' Q'+(x+w)+' '+y+' '+(x+w)+' '+(y+r)+' V'+(y+h)+' Z';
+}
+function cBars(){
+  var ms=monthsBack(12),inn={},out={},mx=0,MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  db.tx.forEach(function(x){var ym=x.date.slice(0,7);if(x.dir==='in')inn[ym]=(inn[ym]||0)+x.amount;else out[ym]=(out[ym]||0)+x.amount});
+  ms.forEach(function(m){mx=Math.max(mx,inn[m]||0,out[m]||0)});
+  var W=620,H=230,L=40,R=8,T=12,B=26,ym=niceMax(mx||1),band=(W-L-R)/12,bw=14,g='';
+  function Y(v){return r1(T+(1-v/ym)*(H-T-B))}
+  var ticks=[0,ym/2,ym];
+  ticks.forEach(function(v){g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text x="'+(L-6)+'" y="'+(Y(v)+3.5)+'" text-anchor="end">'+cmp(v)+'</text>'});
+  ms.forEach(function(m,i){
+    var cx=L+band*i+band/2,a=inn[m]||0,b=out[m]||0,mo=+m.slice(5),lab=MN[mo-1]+((i===0||mo===1)?' '+m.slice(2,4):'');
+    g+='<g><title>'+MN[mo-1]+' '+m.slice(0,4)+': sales '+money(a)+', spent '+money(b)+'</title><rect class="hit" x="'+r1(cx-band/2)+'" y="'+T+'" width="'+r1(band)+'" height="'+(H-T-B)+'"/>';
+    if(a>0)g+='<path d="'+barPath(r1(cx-bw-1),Y(a),bw,r1(H-B-Y(a)),4)+'" style="fill:var(--s1)"/>';
+    if(b>0)g+='<path d="'+barPath(r1(cx+1),Y(b),bw,r1(H-B-Y(b)),4)+'" style="fill:var(--s2)"/>';
+    g+='<text x="'+r1(cx)+'" y="'+(H-8)+'" text-anchor="middle">'+lab+'</text></g>';
+  });
+  g+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+(H-B)+'" y2="'+(H-B)+'"/>';
+  return '<div class="card"><div class="sec"><h2>Income and spending, last 12 months</h2><span class="keys"><span><i class="sw" style="background:var(--s1)"></i>Sales</span><span><i class="sw" style="background:var(--s2)"></i>Spent</span></span></div>'+
+    '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Monthly sales and spending for the last 12 months">'+g+'</svg><div class="small muted">Hover over a month for the exact amounts.</div></div>';
+}
+
 /* ---------- views ---------- */
 function list(rows,emptyMsg){return rows.length?'<div class="list">'+rows.join('')+'</div>':'<div class="empty">'+emptyMsg+'</div>'}
 function moveRow(e){return '<div class="item"><div class="main"><div class="t">'+EVT[e.type]+' · '+e.qty+' '+esc(e.species)+'</div><div class="s">'+dshort(e.date)+(e.who?' · '+esc(e.who):'')+(e.note?' · '+esc(e.note):'')+'</div></div>'+(e.price?'<span class="num">'+money(e.price)+'</span>':'')+'</div>'}
 
+function cAttention(n){
+  var due=sortedSched().filter(function(s){return sdays(s)<=14}).slice(0,n||6);
+  return '<div class="card"><div class="sec"><h2>Needs attention</h2><button class="btn sm" data-a="tab" data-v="health">All</button></div>'+
+    list(due.map(function(s){var p=prod(s.productId);return '<button class="item" data-a="logsched" data-id="'+s.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">Due '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div>'+pillFor(sdays(s))+'</button>'}),'Nothing due in the next 14 days.')+'</div>';
+}
+function cMoves(n){
+  var rec=db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,n||4);
+  return '<div class="card"><h2>Recent movements</h2>'+list(rec.map(moveRow),'No animals added, sold or born yet.')+'</div>';
+}
+function cCal(){return '<div class="card"><h2>Calendar</h2><div class="stack calBody">'+calBody()+'</div></div>'}
+
 function vHome(){
+  if(isWide())return vHomeWide();
   var h='';
   var tiles=SPECIES.filter(function(s){return count(s)>0||s!=='Other'}).map(function(s){return '<div class="tile"><b>'+count(s)+'</b><span>'+s+'</span></div>'}).join('');
   h+='<div class="grid">'+tiles+'</div>';
-  var due=sortedSched().filter(function(s){return sdays(s)<=14}).slice(0,6);
-  h+='<div class="card"><div class="sec"><h2>Needs attention</h2><button class="btn sm" data-a="tab" data-v="health">All</button></div>'+
-    list(due.map(function(s){var p=prod(s.productId);return '<button class="item" data-a="logsched" data-id="'+s.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">Due '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div>'+pillFor(sdays(s))+'</button>'}),'Nothing due in the next 14 days.')+'</div>';
+  h+=cAttention(6);
   var tm=totals('month'),net=tm.tin-tm.tout;
   var fi=feedInfo();
   h+='<div class="card"><div class="sec"><h2>This month</h2><span style="display:flex;gap:6px"><button class="btn sm" data-a="open" data-k="cal">Calendar</button><button class="btn sm" data-a="tab" data-v="money">Details</button></span></div>'+
     '<div class="grid"><div class="tile"><b class="num">'+money(tm.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(tm.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div>';
   if(fi.last){var ago=diff(fi.last.date,today());h+='<div class="small muted">Last feed bought '+ago+' day'+(ago===1?'':'s')+' ago'+(fi.avg?'. You usually buy about every '+Math.round(fi.avg)+' days.':'.')+'</div>'}
   h+='</div>';
-  var rec=db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,4);
-  h+='<div class="card"><h2>Recent movements</h2>'+list(rec.map(moveRow),'No animals added, sold or born yet.')+'</div>';
+  h+=cMoves(4);
   h+='<div class="row"><button class="btn pri" data-a="open" data-k="event" style="flex:1">Animal event</button><button class="btn pri" data-a="open" data-k="treat" style="flex:1">Log treatment</button><button class="btn pri" data-a="open" data-k="tx" style="flex:1">Add expense</button></div>';
+  return h;
+}
+function vHomeWide(){
+  var tm=totals('month'),net=tm.tin-tm.tout,soon=db.schedules.filter(function(s){return sdays(s)<=7}).length;
+  function kp(v,l,c){return '<div class="tile"><b class="num"'+(c?' style="color:var(--'+c+')"':'')+'>'+v+'</b><span>'+l+'</span></div>'}
+  var k=kp(count(),'Animals')+SPECIES.slice(0,4).map(function(s){return kp(count(s),s)}).join('')+
+    kp(moneyC(tm.tout),'Spent this month')+kp(moneyC(tm.tin),'Sales this month')+kp(moneyC(net),'Net this month',net<0?'bad':'good')+kp(soon,'Treatments due in 7 days',soon?'warn':'');
+  var h='<div class="kpis">'+k+'</div>';
+  h+='<div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn pri" data-a="open" data-k="event">Animal event</button><button class="btn pri" data-a="open" data-k="treat">Log treatment</button><button class="btn pri" data-a="open" data-k="tx">Add money in or out</button></div>';
+  h+='<div class="dash">'+
+    '<div class="s8">'+cBars()+'</div><div class="s4">'+cAttention(8)+'</div>'+
+    '<div class="s7">'+cPop()+'</div><div class="s5">'+cCal()+'</div>'+
+    '<div class="s12 row" style="justify-content:flex-start;flex-wrap:wrap"><b>Showing</b>'+periodChips()+'</div>'+
+    '<div class="s6">'+cExpPie()+'</div><div class="s6">'+cIncPie()+'</div>'+
+    '<div class="s7">'+cProfit()+'</div><div class="s5">'+cMoves(6)+'</div>'+
+  '</div>';
   return h;
 }
 
 function vAnimals(){
+  var w=isWide();
   var h='<div class="row"><h2>Animals</h2><button class="btn pri" data-a="open" data-k="event">+ Event</button></div>';
+  h+=cPop();
   h+='<div class="chips">'+['All'].concat(SPECIES.slice(0,4)).map(function(s){return '<button class="chip" aria-pressed="'+(flt===s)+'" data-a="filter" data-v="'+s+'">'+s+(s==='All'?'':' '+count(s))+'</button>'}).join('')+'</div>';
   var rows=db.animals.filter(function(a){return (flt==='All'||a.species===flt)&&(showPast||a.status==='active')});
-  h+='<div class="card">'+list(rows.map(function(a){
-    var ind=isInd(a), sx=ind?(a.sex!=='Unknown'?a.sex:''):(a.sex!=='Mixed'?a.sex:'');
-    var meta=[a.species,sx,ageStr(a.birth),SRC[a.source]||''].filter(Boolean).join(' · ');
-    var par=ind?parentsLine(a):'';
-    return '<button class="item" data-a="animal" data-id="'+a.id+'"><div class="main"><div class="t">'+esc(aLabel(a))+'</div><div class="s">'+esc(meta)+'</div>'+(par?'<div class="s">'+esc(par)+'</div>':'')+'</div>'+(a.status!=='active'?'<span class="pill">'+a.status+'</span>':(ind?'':'<b class="num">'+a.qty+'</b>'))+'</button>';
-  }),'No animals here yet. Add some with an Event (Bought, Born or Already on the farm).')+
-  '<button class="btn sm" data-a="past" style="align-self:flex-start">'+(showPast?'Hide':'Show')+' sold, eaten and dead</button></div>';
+  var toggle='<button class="btn sm" data-a="past" style="align-self:flex-start">'+(showPast?'Hide':'Show')+' sold, eaten and dead</button>';
+  if(w){
+    var G={tag:function(a){return aLabel(a).toLowerCase()},species:function(a){return a.species},sex:function(a){return a.sex},age:function(a){return a.birth||'~'},source:function(a){return a.source},mother:function(a){var m=aById(a.motherId);return m?m.tag.toLowerCase():'~'},father:function(a){var f=aById(a.fatherId);return f?f.tag.toLowerCase():'~'},qty:function(a){return a.qty},status:function(a){return a.status}};
+    var sr=sortBy(rows,'animals',G);
+    h+='<div class="card"><div class="tw"><table class="t"><thead><tr>'+th('animals','tag','Tag or group')+th('animals','species','Type')+th('animals','sex','Sex')+th('animals','age','Age')+th('animals','source','Source')+th('animals','mother','Mother')+th('animals','father','Father')+th('animals','qty','Count',true)+th('animals','status','Status')+'</tr></thead><tbody>'+
+      (sr.length?sr.map(function(a){
+        var ind=isInd(a),m=aById(a.motherId),f=aById(a.fatherId);
+        return '<tr class="clk" data-a="animal" data-id="'+a.id+'"><td><button class="lnk" data-a="animal" data-id="'+a.id+'">'+esc(aLabel(a))+'</button></td><td>'+esc(a.species)+'</td><td>'+esc(ind?(a.sex!=='Unknown'?a.sex:'–'):(a.sex!=='Mixed'?a.sex:'Mixed'))+'</td><td>'+esc(ageStr(a.birth)||'–')+'</td><td>'+esc(SRC[a.source]||'')+'</td><td>'+(m?esc(m.tag):'–')+'</td><td>'+(f?esc(f.tag):'–')+'</td><td class="r num">'+a.qty+'</td><td>'+(a.status==='active'?'<span class="pill good">on farm</span>':'<span class="pill">'+a.status+'</span>')+'</td></tr>';
+      }).join(''):'<tr><td colspan="9" class="empty">No animals here yet. Add some with an Event.</td></tr>')+
+      '</tbody></table></div>'+toggle+'</div>';
+  }else{
+    h+='<div class="card">'+list(rows.map(function(a){
+      var ind=isInd(a), sx=ind?(a.sex!=='Unknown'?a.sex:''):(a.sex!=='Mixed'?a.sex:'');
+      var meta=[a.species,sx,ageStr(a.birth),SRC[a.source]||''].filter(Boolean).join(' · ');
+      var par=ind?parentsLine(a):'';
+      return '<button class="item" data-a="animal" data-id="'+a.id+'"><div class="main"><div class="t">'+esc(aLabel(a))+'</div><div class="s">'+esc(meta)+'</div>'+(par?'<div class="s">'+esc(par)+'</div>':'')+'</div>'+(a.status!=='active'?'<span class="pill">'+a.status+'</span>':(ind?'':'<b class="num">'+a.qty+'</b>'))+'</button>';
+    }),'No animals here yet. Add some with an Event (Bought, Born or Already on the farm).')+toggle+'</div>';
+  }
   var ev=db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,12);
   h+='<div class="card"><h2>Movements</h2>'+list(ev.map(moveRow),'No movements yet.')+'</div>';
   return h;
@@ -381,34 +748,88 @@ function vAnimals(){
 
 function vHealth(){
   var h='<div class="row"><h2>Health</h2><div class="row"><button class="btn" data-a="open" data-k="sched">+ Schedule</button><button class="btn pri" data-a="open" data-k="treat">+ Log</button></div></div>';
-  h+='<div class="card"><h2>Schedules</h2>'+list(sortedSched().map(function(s){
+  var c1='<div class="card"><h2>Schedules</h2>'+list(sortedSched().map(function(s){
     var p=prod(s.productId);
     return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+(p?esc(p.type):'')+' · every '+s.interval+' d · '+(s.last?'last '+dshort(s.last):'not done yet')+' · next '+dshort(s.next)+(s.dose?' · '+esc(s.dose):'')+'</div></div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'+pillFor(sdays(s))+'<span><button class="btn sm pri" data-a="logsched" data-id="'+s.id+'">Done</button> <button class="btn sm" data-a="schededit" data-id="'+s.id+'">Edit</button></span></div></div>';
   }),'No schedules. Add one for each vaccine, dewormer or dip.')+'</div>';
   var hist=db.treatments.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,15);
-  h+='<div class="card"><h2>History</h2>'+list(hist.map(function(t){var p=prod(t.productId);
+  var c2='<div class="card"><h2>History</h2>'+list(hist.map(function(t){var p=prod(t.productId);
     return '<button class="item" data-a="treatedit" data-id="'+t.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(tLabel(t))+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+(t.note?' · '+esc(t.note):'')+'</div></div>'+(t.cost?'<span class="num">'+money(t.cost)+'</span>':'')+'</button>'}),'Nothing logged yet.')+'</div>';
+  return h+(isWide()?'<div class="cols2">'+c1+c2+'</div>':c1+c2);
+}
+
+function cRepeat(){
+  return '<div class="card"><div class="sec"><h2>Repeating costs</h2><button class="btn sm" data-a="txrepeat">+ Add</button></div>'+
+   list(db.recurring.map(function(r){return '<button class="item" data-a="rec" data-id="'+r.id+'"><div class="main"><div class="t">'+esc(r.item||r.cat)+'</div><div class="s">'+esc(r.cat)+(r.species?' · '+esc(r.species):'')+' · '+FREQ[r.freq].toLowerCase()+' · '+(r.active?'next '+dshort(nextOcc(r)):'paused')+'</div></div><b class="num">'+money(r.amount)+'</b></button>'}),'Nothing repeats yet. When you add a cost, choose how often it repeats and it is added for you each time.')+'</div>';
+}
+function cFeed(){
+  var fi=feedInfo();
+  return '<div class="card"><h2>Feed rhythm</h2>'+(fi.avg?'<div class="small muted">Average gap between feed purchases: '+Math.round(fi.avg)+' days. Next one expected around '+dshort(addDays(fi.last.date,Math.round(fi.avg)))+'.</div>':'<div class="small muted">Log at least two feed purchases to see your rhythm.</div>')+
+   list(fi.rows.slice().reverse().slice(0,8).map(function(r){
+     var pl=r.flag==='early'?'<span class="pill warn">Early</span>':r.flag==='late'?'<span class="pill warn">Late</span>':r.flag==='steady'?'<span class="pill good">On rhythm</span>':'';
+     return '<div class="item"><div class="main"><div class="t">'+esc(r.x.item||'Feed')+' · '+money(r.x.amount)+'</div><div class="s">'+dshort(r.x.date)+(r.x.species?' · '+esc(r.x.species):'')+(r.gap!==null?' · '+r.gap+' d after the one before':'')+'</div></div>'+pl+'</div>'}),'No feed purchases yet.')+'</div>';
+}
+function cTx(){
+  var tx=db.tx.filter(function(x){return inPeriod(x.date,period)});
+  if(isWide()){
+    var G={date:function(x){return x.date},item:function(x){return (x.item||x.cat).toLowerCase()},cat:function(x){return x.cat},sp:function(x){return x.species||'~'},sup:function(x){return (x.supplier||'').toLowerCase()},amt:function(x){return x.dir==='in'?x.amount:-x.amount}};
+    var rows=sortBy(tx,'tx',G).slice(0,300);
+    return '<div class="card"><h2>Transactions</h2><div class="tw"><table class="t"><thead><tr>'+th('tx','date','Date')+th('tx','item','What for')+th('tx','cat','Category')+th('tx','sp','Animal type')+th('tx','sup','Supplier or buyer')+th('tx','amt','Amount (P)',true)+'</tr></thead><tbody>'+
+      (rows.length?rows.map(function(x){
+        return '<tr class="clk" data-a="txedit" data-id="'+x.id+'"><td>'+dshort(x.date)+'</td><td><button class="lnk" data-a="txedit" data-id="'+x.id+'">'+esc(x.item||x.cat)+'</button>'+(x.recId?' <span class="pill">repeating</span>':'')+'</td><td>'+esc(x.cat)+'</td><td>'+esc(x.species||'–')+'</td><td>'+esc(x.supplier||'–')+'</td><td class="r num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+num2(x.amount)+'</td></tr>';
+      }).join(''):'<tr><td colspan="6" class="empty">Nothing recorded in this period.</td></tr>')+'</tbody></table></div></div>';
+  }
+  tx=tx.sort(function(a,b){return a.date<b.date?1:-1}).slice(0,30);
+  return '<div class="card"><h2>Transactions</h2>'+list(tx.map(function(x){
+    return '<button class="item" data-a="txedit" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
+}
+function vMoney(){
+  var T=totals(period),net=T.tin-T.tout,w=isWide();
+  var h='<div class="row"><h2>Money</h2><div class="row"><button class="btn" data-a="open" data-k="cal">Calendar</button><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div></div>';
+  h+=periodChips();
+  h+='<div class="card"><div class="grid"><div class="tile"><b class="num">'+money(T.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(T.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div></div>';
+  h+=w?'<div class="cols2">'+cExpPie()+cIncPie()+'</div>':cExpPie()+cIncPie();
+  h+=cProfit();
+  if(w)h+=cBars();
+  h+=w?'<div class="cols2">'+cRepeat()+cFeed()+'</div>':cRepeat()+cFeed();
+  h+=cTx();
   return h;
 }
 
-function vMoney(){
-  var labels={month:'This month',last:'Last month',year:'This year',all:'All time'};
-  var T=totals(period),net=T.tin-T.tout;
-  var h='<div class="row"><h2>Money</h2><div class="row"><button class="btn" data-a="open" data-k="cal">Calendar</button><button class="btn pri" data-a="open" data-k="tx">+ Add</button></div></div>';
-  h+='<div class="chips">'+Object.keys(labels).map(function(k){return '<button class="chip" aria-pressed="'+(period===k)+'" data-a="period" data-v="'+k+'">'+labels[k]+'</button>'}).join('')+'</div>';
-  var cats=Object.keys(T.out).sort(function(a,b){return T.out[b]-T.out[a]}),mx=cats.length?T.out[cats[0]]:1;
-  h+='<div class="card"><div class="grid"><div class="tile"><b class="num">'+money(T.tout)+'</b><span>Spent</span></div><div class="tile"><b class="num">'+money(T.tin)+'</b><span>Sales</span></div><div class="tile"><b class="num" style="color:var(--'+(net<0?'bad':'good')+')">'+money(net)+'</b><span>Net</span></div></div>'+
-   (cats.length?'<h3>Where it went</h3>'+cats.map(function(c){return '<div class="bar"><span>'+c+'</span><div class="track"><i style="width:'+Math.max(2,Math.round(T.out[c]/mx*100))+'%"></i></div><span class="num">'+money(T.out[c])+'</span></div>'}).join(''):'<div class="empty">No spending in this period.</div>')+'</div>';
-  h+='<div class="card"><div class="sec"><h2>Repeating costs</h2><button class="btn sm" data-a="txrepeat">+ Add</button></div>'+
-   list(db.recurring.map(function(r){return '<button class="item" data-a="rec" data-id="'+r.id+'"><div class="main"><div class="t">'+esc(r.item||r.cat)+'</div><div class="s">'+esc(r.cat)+' · '+FREQ[r.freq].toLowerCase()+' · '+(r.active?'next '+dshort(nextOcc(r)):'paused')+'</div></div><b class="num">'+money(r.amount)+'</b></button>'}),'Nothing repeats yet. When you add a cost, choose how often it repeats and it is added for you each time.')+'</div>';
-  var fi=feedInfo();
-  h+='<div class="card"><h2>Feed rhythm</h2>'+(fi.avg?'<div class="small muted">Average gap between feed purchases: '+Math.round(fi.avg)+' days. Next one expected around '+dshort(addDays(fi.last.date,Math.round(fi.avg)))+'.</div>':'<div class="small muted">Log at least two feed purchases to see your rhythm.</div>')+
-   list(fi.rows.slice().reverse().slice(0,8).map(function(r){
-     var pl=r.flag==='early'?'<span class="pill warn">Early</span>':r.flag==='late'?'<span class="pill warn">Late</span>':r.flag==='steady'?'<span class="pill good">On rhythm</span>':'';
-     return '<div class="item"><div class="main"><div class="t">'+esc(r.x.item||'Feed')+' · '+money(r.x.amount)+'</div><div class="s">'+dshort(r.x.date)+(r.gap!==null?' · '+r.gap+' d after the one before':'')+'</div></div>'+pl+'</div>'}),'No feed purchases yet.')+'</div>';
-  var tx=db.tx.slice().sort(function(a,b){return a.date<b.date?1:-1}).filter(function(x){return inPeriod(x.date,period)}).slice(0,30);
-  h+='<div class="card"><h2>Transactions</h2>'+list(tx.map(function(x){
-    return '<button class="item" data-a="txedit" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+esc(x.cat)+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
+/* spending or income slice breakdown */
+function fSlice(pre){
+  var P=PERIODS[period],txs,tot,h;
+  if(pre.k==='exp'){
+    txs=periodTx(period).filter(function(x){return x.dir==='out'&&x.cat===pre.v});
+    tot=txs.reduce(function(s,x){return s+x.amount},0);
+    var all=totals(period).tout;
+    var items=groupSum(txs,function(x){return (x.item||'').trim()||'No description'});
+    var top=items.slice(0,6).map(function(r){return {label:r.k,v:r.v}}),rest=items.slice(6).reduce(function(s,r){return s+r.v},0);
+    if(rest>0)top.push({label:'Other items',v:rest});
+    var spp=groupSum(txs,function(x){return x.species||''}).map(function(r){return {key:r.k,label:r.k||'Whole farm (shared)',v:r.v}});
+    h=head(esc(pre.v))+'<div class="small muted">'+P+' · '+money(tot)+(all>0?' · '+pct(tot/all)+' of all spending':'')+'</div>';
+    if(!txs.length)return h+'<div class="empty">Nothing in this category for this period.</div>';
+    h+='<h3>What it was spent on</h3>'+hbars(top,tot)+'<h3>For which animals</h3>'+hbars(spp,tot,function(r){return spColor(r.key)});
+    return h;
+  }
+  var key=pre.v||'';
+  txs=periodTx(period).filter(function(x){return x.dir==='in'&&(x.species||'')===key});
+  tot=txs.reduce(function(s,x){return s+x.amount},0);
+  var allIn=totals(period).tin,pd=profitData(period,splitShared),row=pd.rows.filter(function(r){return r.sp===key})[0];
+  h=head(esc(spName(key)))+'<div class="small muted">'+P+(allIn>0&&tot>0?' · '+pct(tot/allIn)+' of all income':'')+'</div>';
+  var cost=row?row.cost:0,profit=tot-cost;
+  h+='<div class="sum3"><div class="tile"><b class="num">'+money(tot)+'</b><span>Earned</span></div>'+(key?'<div class="tile"><b class="num">'+money(cost)+'</b><span>Costs</span></div><div class="tile"><b class="num" style="color:var(--'+(profit<0?'bad':'good')+')">'+money(profit)+'</b><span>Profit</span></div>':'')+'</div>';
+  if(!txs.length)return h+'<div class="empty">No income recorded for this in the period.</div>'+(key?'<div class="small muted">Costs shown are the ones you tagged to '+esc(key.toLowerCase())+'.</div>':'');
+  var types=groupSum(txs,function(x){return x.cat}).map(function(r){return {label:r.k,v:r.v}});
+  h+='<h3>Where it came from</h3>'+hbars(types,tot);
+  var per={},untied=0;
+  txs.forEach(function(x){
+    var ids=(x.animalIds||[]).filter(function(id){return aById(id)});
+    if(!ids.length)untied+=x.amount;else ids.forEach(function(id){per[id]=(per[id]||0)+x.amount/ids.length});
+  });
+  var arows=Object.keys(per).map(function(id){return {label:aLabel(aById(id)),v:per[id]}}).sort(function(a,b){return b.v-a.v});
+  if(arows.length){if(untied>0)arows.push({label:'Not tied to one animal',v:untied});h+='<h3>By animal</h3>'+hbars(arows,tot)}
+  if(key&&!splitShared&&pd.sharedAll>0)h+='<div class="small muted">Costs here are only those tagged to '+esc(key.toLowerCase())+'. Shared farm costs ('+money(pd.sharedAll)+') are left out. Use the split option in Profit per animal type to include a share.</div>';
   return h;
 }
 
@@ -474,14 +895,17 @@ function vMore(){
 }
 
 function render(){
-  var app=document.getElementById('app');
+  var app=document.getElementById('app'),w=isWide();
+  if(!calMonth){calMonth=today().slice(0,7);calDay=today()}
   var head='<div class="top"><div><h1>Farm Book</h1><small>'+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})+'</small></div><div class="num" style="text-align:right"><b style="font-family:var(--display);font-size:1.4rem">'+count()+'</b><small>animals</small></div></div>';
   var ban=db.example?'<div class="banner"><span>Showing example records</span><button class="btn sm" data-a="tab" data-v="more">Start with my own</button></div>':'';
   var bd=backupDue();
   var bban=bd?'<div class="banner"><span>'+bd.text+'. Back up now so you do not lose records.</span><button class="btn sm" data-a="share">Back up</button></div>':'';
   var v={home:vHome,animals:vAnimals,health:vHealth,money:vMoney,more:vMore}[tab]();
+  if(w&&tab==='more')v='<div class="narrow">'+v+'</div>';
   app.innerHTML=head+ban+bban+v;
-  document.getElementById('nav').innerHTML=TABS.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[2]]+t[1]+'</button>'}).join('');
+  document.getElementById('nav').innerHTML='<div class="brand">Farm Book</div>'+TABS.map(function(t){return '<button data-a="tab" data-v="'+t[0]+'"'+(tab===t[0]?' aria-current="page"':'')+'>'+IC[t[2]]+t[1]+'</button>'}).join('');
+  document.body.classList.toggle('wide',w);
 }
 
 /* ---------- forms ---------- */
@@ -562,14 +986,39 @@ function syncEvent(){
     if(m.length){box.hidden=false;box.textContent='Withdrawal period still running: '+m.join(', ')+'. Check before you slaughter or sell.'}
   }
 }
+function spOpts(dir,sel){return '<option value="">'+(dir==='in'?'Not specific':'Whole farm (shared)')+'</option>'+SPECIES.map(function(s){return '<option value="'+s+'"'+(s===sel?' selected':'')+'>'+s+'</option>'}).join('')}
+function pickBlock(sp,sel){
+  if(!sp)return '';
+  var l=db.animals.filter(function(a){return isInd(a)&&a.species===sp&&(a.status==='active'||sel.indexOf(a.id)>=0)});
+  if(!l.length)return '<div class="small muted">No tagged '+esc(sp.toLowerCase())+' on record yet. Add them in Animal event to pick them here.</div>';
+  return '<div class="fgroup"><span class="fl">Which animals <small>optional</small></span><div class="picks">'+l.map(function(a){return '<label class="pick"><input type="checkbox" name="pick" value="'+a.id+'"'+(sel.indexOf(a.id)>=0?' checked':'')+'><span>'+esc(a.tag)+'</span></label>'}).join('')+'</div></div>';
+}
+function syncTx(form,ch){
+  var fe=form.elements,dir=fe.dir.value;
+  if(ch==='dir'){
+    fe.cat.innerHTML=opts(dir==='in'?INCATS:OUTCATS,dir==='in'?'Animal sales':'Feed');
+    fe.species.innerHTML=spOpts(dir,'');
+    var rw=document.getElementById('repWrap');if(rw)rw.hidden=(dir==='in');
+    document.getElementById('spLbl').textContent=dir==='in'?'Earned by':'Spent on';
+  }
+  var cat=fe.cat.value;
+  if(ch==='cat'&&dir==='in'&&!fe.species.value){if(cat==='Eggs')fe.species.value='Chickens';if(cat==='Milk')fe.species.value='Cattle'}
+  var sel=(ch==='species'||ch==='dir')?[]:[].map.call(form.querySelectorAll('input[name=pick]:checked'),function(c){return c.value});
+  document.getElementById('pickWrap').innerHTML=pickBlock(fe.species.value,sel);
+  document.getElementById('saleHint').hidden=!(dir==='in'&&cat==='Animal sales');
+}
 function fTx(pre){
   var x=pre.id?db.tx.find(function(r){return r.id===pre.id}):null;
   if(pre.id&&!x)return '';
-  var dir=x?x.dir:'out', rep=pre.repeat||'none';
+  var dir=x?x.dir:'out',rep=pre.repeat||'none',sp=x?(x.species||''):(pre.species||''),sel=x?(x.animalIds||[]):[];
+  var cat=x?x.cat:(dir==='in'?'Animal sales':(pre.repeat?'Labour':'Feed'));
   return head(x?'Edit entry':'Add money in or out')+'<form data-form="tx" id="txForm">'+hid(x&&x.id)+
    '<div class="two">'+fld('Type','<select name="dir"><option value="out"'+(dir==='out'?' selected':'')+'>Spent</option><option value="in"'+(dir==='in'?' selected':'')+'>Received</option></select>')+fld('Date','<input type="date" name="date" value="'+(x?x.date:(pre.date||today()))+'" required>')+'</div>'+
-   '<div class="two">'+fld('Category','<select name="cat">'+opts(dir==='in'?INCATS:OUTCATS,x?x.cat:(dir==='in'?'Sales':(pre.repeat?'Labour':'Feed')))+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+(x?x.amount:'')+'">')+'</div>'+
+   '<div class="two">'+fld('Category','<select name="cat">'+opts(dir==='in'?INCATS:OUTCATS,cat)+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+(x?x.amount:'')+'">')+'</div>'+
    fld('What for','<input name="item" placeholder="e.g. Lucerne bales, 20 bags" value="'+esc(x?x.item:'')+'">')+
+   fld('<span id="spLbl">'+(dir==='in'?'Earned by':'Spent on')+'</span>','<select name="species">'+spOpts(dir,sp)+'</select>')+
+   '<div class="stack" id="pickWrap">'+pickBlock(sp,sel)+'</div>'+
+   '<div class="small muted" id="saleHint"'+((dir==='in'&&cat==='Animal sales')?'':' hidden')+'>To also take the animal off your count, use Animal event and choose Sold.</div>'+
    fld('Supplier or buyer','<input name="supplier" placeholder="Optional" value="'+esc(x?x.supplier:'')+'">')+
    (x?(x.recId?'<div class="small muted">This entry was added by a repeating cost. Changing it here changes only this entry.</div>':''):
      '<div class="stack" id="repWrap"'+(dir==='in'?' hidden':'')+'>'+fld('Repeat','<select name="repeat"><option value="none"'+(rep==='none'?' selected':'')+'>Does not repeat</option>'+Object.keys(FREQ).map(function(k){return '<option value="'+k+'"'+(rep===k?' selected':'')+'>'+FREQ[k]+'</option>'}).join('')+'</select>')+
@@ -581,6 +1030,7 @@ function fRec(pre){
   return head('Repeating cost')+'<form data-form="rec">'+hid(r.id)+
    fld('What for','<input name="item" value="'+esc(r.item)+'" placeholder="e.g. Farm hand wages">')+
    '<div class="two">'+fld('Category','<select name="cat">'+opts(OUTCATS,r.cat)+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+r.amount+'">')+'</div>'+
+   fld('Spent on','<select name="species">'+spOpts('out',r.species||'')+'</select>')+
    fld('Supplier or person','<input name="supplier" value="'+esc(r.supplier)+'" placeholder="Optional">')+
    '<div class="two">'+fld('How often','<select name="freq">'+opts(Object.keys(FREQ).map(function(k){return [k,FREQ[k]]}),r.freq)+'</select>')+fld('Next payment','<input type="date" name="next" value="'+nextOcc(r)+'" required>')+'</div>'+
    fld('Status','<select name="active">'+opts([['yes','Active'],['no','Paused']],r.active?'yes':'no')+'</select>')+
@@ -599,6 +1049,7 @@ function fAnimal(pre){
     h+='<h3>Family</h3><div class="stack">'+famRow('Mother',aById(a.motherId))+famRow('Father',aById(a.fatherId))+
       '<div class="row" style="align-items:flex-start"><span class="muted">Offspring ('+kids.length+')</span>'+(kids.length?'<div class="chips" style="justify-content:flex-end">'+kids.map(function(k){return '<button class="chip" data-a="animal" data-id="'+k.id+'">'+esc(aLabel(k))+'</button>'}).join('')+'</div>':'<span class="muted">None recorded</span>')+'</div></div>';
   }
+  if(ind){var at=attrib(a.id);if(at.earned>0||at.spent>0)h+='<h3>Money</h3><div class="sum3"><div class="tile"><b class="num">'+money(at.earned)+'</b><span>Earned</span></div><div class="tile"><b class="num">'+money(at.spent)+'</b><span>Costs</span></div><div class="tile"><b class="num" style="color:var(--'+(at.earned-at.spent<0?'bad':'good')+')">'+money(at.earned-at.spent)+'</b><span>Net</span></div></div>'}
   h+='<h3>Recent treatments</h3>'+list(tr.map(function(t){var p=prod(t.productId);return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+'</div></div></div>'}),'None logged.')+
    '<div class="row"><button class="btn" data-a="animaledit" data-id="'+a.id+'" style="flex:1">Edit</button><button class="btn" data-a="treatfor" data-id="'+a.id+'" style="flex:1">Log treatment</button></div>'+
    rmBlock('animals',a.id,'record');
@@ -649,21 +1100,21 @@ function calBody(){
   else{
     var sd=st[calDay], dl=due[calDay]||[], nd=sd?sd['in']-sd.out:0;
     h+='<div class="stack"><div class="sec"><h3>'+dlong(calDay)+'</h3>'+(sd?'<b class="num" style="color:var(--'+(nd<0?'bad':'good')+')">'+(nd>0?'+':'')+money(nd)+'</b>':'')+'</div>';
-    if(sd)h+=list(sd.items.map(function(x){return '<div class="item"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+esc(x.cat)+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></div>'}),'');
+    if(sd)h+=list(sd.items.map(function(x){return '<div class="item"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></div>'}),'');
     else h+='<div class="empty">Nothing recorded on this day.</div>';
     dl.forEach(function(s){var p=prod(s.productId);h+='<div class="item"><div class="main"><div class="t">Due: '+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+esc(s.dose||'')+'</div></div><span class="pill warn">Health</span></div>'});
     h+='<button class="btn sm" data-a="caladd" style="align-self:flex-start">Add an entry on this day</button></div>';
   }
   return h;
 }
-function fCal(){return head('Calendar')+'<div class="stack" id="calBody">'+calBody()+'</div>'}
-function renderCal(){var el=document.getElementById('calBody');if(el)el.innerHTML=calBody()}
+function fCal(){return head('Calendar')+'<div class="stack calBody">'+calBody()+'</div>'}
+function renderCal(){var a=document.querySelectorAll('.calBody'),h=calBody();for(var i=0;i<a.length;i++)a[i].innerHTML=h}
 function shiftMonth(n){var y=+calMonth.slice(0,4),m=+calMonth.slice(5,7)-1+n;y+=Math.floor(m/12);m=((m%12)+12)%12;calMonth=y+'-'+p2(m+1);calDay=''}
 
 function openSheet(kind,pre){
   cur={kind:kind,pre:pre||{}};
   if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
-  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal}[kind](cur.pre);
+  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice}[kind](cur.pre);
   if(!html){cur=null;return}
   var host=document.getElementById('sheetHost');
   host.innerHTML='<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
@@ -685,7 +1136,13 @@ function removeRow(c,id){
     return;
   }
   if(c==='tx'){db.tx=db.tx.filter(function(x){return x.id!==id});db.treatments.forEach(function(t){if(t.txId===id){t.txId='';t.cost=0}});return}
-  if(c==='animals'){db.animals=db.animals.filter(function(x){return x.id!==id});db.animals.forEach(function(a){if(a.motherId===id)a.motherId='';if(a.fatherId===id)a.fatherId=''});return}
+  if(c==='animals'){
+    db.animals=db.animals.filter(function(x){return x.id!==id});
+    db.animals.forEach(function(a){if(a.motherId===id)a.motherId='';if(a.fatherId===id)a.fatherId=''});
+    db.tx.forEach(function(x){x.animalIds=(x.animalIds||[]).filter(function(i){return i!==id})});
+    db.recurring.forEach(function(r){r.animalIds=(r.animalIds||[]).filter(function(i){return i!==id})});
+    return;
+  }
   db[c]=db[c].filter(function(x){return x.id!==id});
 }
 var forms={
@@ -727,23 +1184,27 @@ var forms={
  },
  tx:function(f){
   var amt=+f.amount;if(!(amt>0))return E('Enter an amount above 0.');
+  var sp=f.species||'',picks=[].concat(f.pick||[]).filter(Boolean).filter(function(id){var a=aById(id);return a&&a.species===sp});
+  if(f.dir==='in'&&NEEDSP.indexOf(f.cat)>=0&&!sp)return E('Choose which type of animal this came from.');
+  if(!sp)picks=[];
   if(f._id){
     var x=db.tx.find(function(r){return r.id===f._id});if(!x)return E('That entry no longer exists.');
-    x.date=f.date;x.dir=f.dir;x.cat=f.cat;x.amount=amt;x.item=f.item.trim();x.supplier=f.supplier.trim();
+    x.date=f.date;x.dir=f.dir;x.cat=f.cat;x.amount=amt;x.item=f.item.trim();x.supplier=f.supplier.trim();x.species=sp;x.animalIds=picks;
     db.treatments.forEach(function(t){if(t.txId===x.id)t.cost=amt});
     return;
   }
   if(f.dir==='out'&&f.repeat&&f.repeat!=='none'){
-    db.recurring.push({id:uid(),dir:'out',cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),freq:f.repeat,start:f.date,dom:+f.date.slice(8),lastGen:null,active:true});
+    db.recurring.push({id:uid(),dir:'out',cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),freq:f.repeat,start:f.date,dom:+f.date.slice(8),lastGen:null,active:true,species:sp,animalIds:picks});
     runRecurring();
     return {msg:'Repeating cost saved: '+FREQ[f.repeat].toLowerCase()+', from '+dshort(f.date)+'.'};
   }
-  db.tx.push({id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),note:''});
+  db.tx.push({id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),note:'',species:sp,animalIds:picks});
  },
  rec:function(f){
   var r=db.recurring.find(function(x){return x.id===f._id});if(!r)return E('That repeating cost no longer exists.');
   var amt=+f.amount;if(!(amt>0))return E('Enter an amount above 0.');
   r.item=f.item.trim();r.cat=f.cat;r.amount=amt;r.supplier=f.supplier.trim();
+  var oldSp=r.species||'';r.species=f.species||'';if(r.species!==oldSp)r.animalIds=[];
   var cur0=nextOcc(r),was=r.active;
   r.active=f.active==='yes';
   if(f.next!==cur0||f.freq!==r.freq){r.freq=f.freq;r.start=f.next;r.dom=+f.next.slice(8);r.lastGen=null}
@@ -766,7 +1227,7 @@ var forms={
  event:function(f){
   var t=f.type,price=+f.price||0;
   if(t==='bought'||t==='born'||t==='existing'){
-    var sp=f.species,q,note=f.note.trim();
+    var sp=f.species,q,note=f.note.trim(),newIds=[];
     if(f.kind==='individual'){
       var tags=String(f.tags||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
       if(!tags.length)return E('Enter a tag number for the animal.');
@@ -778,26 +1239,26 @@ var forms={
         if(tagTaken(tags[i]))return E('The tag '+tags[i]+' is already used by another animal.');
       }
       var withParents=(t==='born'||t==='existing');
-      tags.forEach(function(tg){db.animals.push({id:uid(),tag:tg,species:sp,sex:f.sexI,qty:1,source:t,birth:t==='born'?f.date:(f.birthI||''),status:'active',kind:'individual',motherId:withParents?(f.mother||''):'',fatherId:withParents?(f.father||''):''})});
+      tags.forEach(function(tg){var nid=uid();newIds.push(nid);db.animals.push({id:nid,tag:tg,species:sp,sex:f.sexI,qty:1,source:t,birth:t==='born'?f.date:(f.birthI||''),status:'active',kind:'individual',motherId:withParents?(f.mother||''):'',fatherId:withParents?(f.father||''):''})});
       q=tags.length;if(!note)note=tags.join(', ');
     }else{
       q=Math.max(1,parseInt(f.qtyNew,10)||1);
       db.animals.push({id:uid(),tag:f.tagG.trim(),species:sp,sex:f.sexG,qty:q,source:t,birth:t==='born'?f.date:'',status:'active',kind:'group',motherId:'',fatherId:''});
     }
     db.stock.push({id:uid(),date:f.date,type:t,species:sp,qty:q,who:t==='bought'?(f.who||''):'',price:t==='bought'?price:0,note:note});
-    if(t==='bought'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+sp.toLowerCase(),supplier:f.who||'',note:''});
+    if(t==='bought'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+sp.toLowerCase(),supplier:f.who||'',note:'',species:sp,animalIds:newIds});
   }else{
     var a=aById(f.animalId);if(!a)return E('Choose an animal first.');
     var q2=isInd(a)?1:Math.max(1,Math.min(a.qty,parseInt(f.qtyOut,10)||1));
     a.qty-=q2;if(a.qty<=0){a.qty=q2;a.status=t}
     db.stock.push({id:uid(),date:f.date,type:t,species:a.species,qty:q2,who:f.who||'',price:t==='sold'?price:0,note:f.note.trim()||(isInd(a)?a.tag:'')});
-    if(t==='sold'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'in',cat:'Sales',amount:price,item:(isInd(a)?a.tag:q2+' '+a.species.toLowerCase())+' sold',supplier:f.who||'',note:''});
+    if(t==='sold'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'in',cat:'Animal sales',amount:price,item:(isInd(a)?a.tag:q2+' '+a.species.toLowerCase())+' sold',supplier:f.who||'',note:'',species:a.species,animalIds:isInd(a)?[a.id]:[]});
   }
  }
 };
 
 /* ---------- events ---------- */
-function fd(form){var o={};new FormData(form).forEach(function(v,k){o[k]=v});return o}
+function fd(form){var o={};new FormData(form).forEach(function(v,k){if(k in o)o[k]=[].concat(o[k],v);else o[k]=v});return o}
 var actions={
  tab:function(d){tab=d.v;confirmKey=null;render();window.scrollTo(0,0)},
  open:function(d){openSheet(d.k,{})},
@@ -814,6 +1275,11 @@ var actions={
  txedit:function(d){openSheet('tx',{id:d.id})},
  txrepeat:function(){openSheet('tx',{repeat:'monthly'})},
  rec:function(d){openSheet('rec',{id:d.id})},
+ slice:function(d){openSheet('slice',{k:d.k,v:d.v})},
+ sort:function(d){var q=SORT[d.t];if(q.k===d.k)q.d=-q.d;else{q.k=d.k;q.d=1}render()},
+ split:function(){splitShared=!splitShared;render()},
+ poprange:function(d){popRange=d.v;render()},
+ poptog:function(d){popHide[d.v]=!popHide[d.v];render()},
  calprev:function(){shiftMonth(-1);renderCal()},
  calnext:function(){shiftMonth(1);renderCal()},
  calday:function(d){calDay=d.d;renderCal()},
@@ -867,13 +1333,13 @@ document.addEventListener('change',function(e){
   }
   if(form.id==='aeForm'&&/^(species|mother|father)$/.test(el.name))syncParents(form);
   if(form.id==='txForm'){
-    if(el.name==='dir'){
-      form.elements.cat.innerHTML=opts(el.value==='in'?INCATS:OUTCATS,el.value==='in'?'Sales':'Feed');
-      var rw=document.getElementById('repWrap');if(rw)rw.hidden=(el.value==='in');
-    }
+    if(el.name==='dir'||el.name==='cat'||el.name==='species')syncTx(form,el.name);
     if(el.name==='repeat'){var hn=document.getElementById('repHint');if(hn)hn.hidden=(el.value==='none')}
   }
 });
+document.addEventListener('pointermove',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
+document.addEventListener('pointerdown',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
+try{var mq=window.matchMedia('(min-width: 900px)');var onmq=function(){render()};if(mq.addEventListener)mq.addEventListener('change',onmq);else if(mq.addListener)mq.addListener(onmq)}catch(e){}
 function notifyRecurring(n){if(n&&!db.example){render();toast('Added '+n+' repeating cost'+(n>1?'s':'')+' to Money.')}}
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&db){var n=runRecurring();if(n){if(db.example)render();else notifyRecurring(n)}}});
 
