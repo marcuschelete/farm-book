@@ -35,3 +35,8 @@ Your records are saved on your own device. Sign in under **Backup** to keep a cl
 - **Production**: eggs, milk, wool, honey and weights, with a 14-day chart and top producers.
 - **Reminders**: due vaccines, expected births and tasks show in Needs attention on Home, and can be downloaded as a calendar file (.ics) for the phone calendar.
 - Animals now have optional name, breed and camp (paddock), species icons, a search box and a camps summary. Excel import and export include Name, Breed and Camp. Breeding, production and tasks are not imported from Excel; they travel in the app backup.
+
+## Owners and weights import
+
+- Animals have an optional **Owner**, for farms where several people keep animals together. A filter row on the Animals tab shows one owner's animals at a time. A newborn gets its mother's owner unless you type another.
+- Excel import and export have an Owner column, and import has a new **Weights** page (date, animal tag, what, amount, unit).
