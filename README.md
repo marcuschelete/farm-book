@@ -27,3 +27,11 @@ Your records are saved on your own device. Sign in under **Backup** to keep a cl
 ## Files
 
 `index.html` is the whole app. `manifest.json`, `sw.js` and the two icons make it installable and available offline.
+
+## Work tab (tasks, breeding, production)
+
+- **Tasks**: things to do, with a due date, who does it and repeat (daily, weekly, monthly). Ticking a repeating task sets up the next one.
+- **Breeding**: record a mating and the app works out the expected birth date from the species. "Record the young" turns a breeding into a birth event with dam and sire filled in.
+- **Production**: eggs, milk, wool, honey and weights, with a 14-day chart and top producers.
+- **Reminders**: due vaccines, expected births and tasks show in Needs attention on Home, and can be downloaded as a calendar file (.ics) for the phone calendar.
+- Animals now have optional name, breed and camp (paddock), species icons, a search box and a camps summary. Excel import and export include Name, Breed and Camp. Breeding, production and tasks are not imported from Excel; they travel in the app backup.
