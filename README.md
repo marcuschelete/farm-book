@@ -17,11 +17,11 @@ Your records are saved on your own device. Sign in under **Backup** to keep a cl
 - Pula (P) is the main currency. When you log a purchase, sale, expense or treatment you can choose South African rand (R) and enter the rate. The app saves the value in pula so every total stays in one currency, and remembers the last rate you used.
 - Vaccine, dewormer and dip schedules with due dates and withdrawal-period warnings
 - Repeating costs, calendar with profit and loss per day, profit per animal type, charts
-- Excel and CSV import, Excel and PDF export, receipt scanning, cloud backup
+- Excel and CSV import of animals, money, treatments, schedules and movements (or a whole workbook in one go), Excel and PDF export, receipt scanning, cloud backup
 
 ## Notes
 
-- Receipt scanning and spreadsheet import still read amounts as pula.
+- Receipt scanning still reads amounts as pula. Spreadsheet import reads rand rows when the sheet has Currency and Rate columns.
 - Breeding records only count young that were added one by one with a tag and linked to their dam or sire.
 
 ## Files
