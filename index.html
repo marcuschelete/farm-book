@@ -90,6 +90,20 @@ input,select,textarea{font:400 1rem var(--body);background:var(--bg);color:var(-
 pre.code{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:160px;font-size:.75rem;margin:0}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 .stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+/* Import: swipeable preview, one page per kind of record */
+.ptabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;position:sticky;top:-18px;z-index:2;background:var(--surface);padding:4px 0}
+.ptab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:5px 2px;min-height:46px;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:600 .7rem var(--body);cursor:pointer}
+.ptab span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptab b{font:700 .95rem var(--display);font-variant-numeric:tabular-nums}
+.ptab[data-s="none"],.ptab[data-s="skip"]{color:var(--muted)}
+.ptab[data-s="warn"]{border-color:var(--warn)}
+.ptab[aria-selected="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.ipager{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;align-items:flex-start;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.ipager::-webkit-scrollbar{display:none}
+.ipage{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
+details.mapd>summary{cursor:pointer;font-weight:600;font-size:.9rem;color:var(--accent);min-height:32px;display:flex;align-items:center}
+.impfoot{position:sticky;bottom:calc(-20px - env(safe-area-inset-bottom,0px));z-index:2;background:var(--surface);border-top:1px solid var(--line);padding:8px 0 calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px}
+
 .sum3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .sum3 .tile{padding:8px 10px;min-width:0}
 .sum3 .tile b{font-size:1.05rem;overflow-wrap:anywhere}
@@ -1568,38 +1582,7 @@ function sheetKind(name){
   if(/animal|livestock|herd/.test(l))return 'animals';
   return '';
 }
-function impBuildAll(){
-  var found={},parts=[],ignored=[];
-  imp.sheets.forEach(function(sh,i){var k=sheetKind(sh.name);if(k&&found[k]===undefined)found[k]=i;else if(!k&&!/^(how to use|lists?)$/i.test(sh.name))ignored.push(sh.name)});
-  var save={kind:imp.kind,si:imp.si,map:imp.map,mode:imp.mode,hdr:imp.hdr};
-  impExtra=[];
-  ['animals','money','treatments','schedules','movements'].forEach(function(k){
-    if(found[k]===undefined)return;
-    imp.kind=k;imp.si=found[k];imp.hdr=true;impGuess();
-    var res=impBuild();
-    if(k==='animals')impExtra=res.animals.slice();
-    parts.push({kind:k,sheet:imp.sheets[found[k]].name,res:res});
-  });
-  imp.kind=save.kind;imp.si=save.si;imp.map=save.map;imp.mode=save.mode;imp.hdr=save.hdr;
-  imp.parts=parts;imp.ignored=ignored;
-  return parts;
-}
 var KINDNAME={animals:['animal records','Animals'],money:['money entries','Money'],treatments:['treatments','Treatments'],schedules:['schedules','Schedules'],movements:['movements','Movements']};
-function impBodyAll(){
-  var h='',tot=0;
-  imp.parts.forEach(function(pt){
-    var r=pt.res,kn=KINDNAME[pt.kind];tot+=r.n;
-    h+='<div class="card" style="padding:12px"><div class="sec"><h3>'+kn[1]+'</h3><span class="muted small">sheet '+esc(pt.sheet)+'</span></div><div><b class="num">'+r.n+'</b> '+kn[0]+' ready'+(r.dup?' · '+r.dup+' already in the app':'')+(r.skipped?' · '+r.skipped+' skipped':'')+'</div>';
-    if(pt.kind==='animals'&&r.counts)h+='<div class="small muted">'+Object.keys(r.counts).map(function(sp){return r.counts[sp]+' '+sp.toLowerCase()}).join(', ')+'</div>';
-    if(pt.kind==='money')h+='<div class="small muted">In '+moneyC(r.tin)+' · Out '+moneyC(r.tout)+'</div>';
-    if(r.note)h+='<div class="small muted">'+esc(r.note)+'</div>';
-    r.warn.forEach(function(w){h+='<div class="warnbox">'+esc(w)+'</div>'});
-    h+='</div>';
-  });
-  if(imp.ignored&&imp.ignored.length)h+='<div class="small muted">Sheets not used: '+imp.ignored.map(esc).join(', ')+'.</div>';
-  h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button>'+(tot?'<button class="btn pri" data-a="impgo" style="flex:1">Add everything ('+tot+')</button>':'')+'</div>';
-  return h;
-}
 function subOf(v){var l=String(v||'').toLowerCase();if(/layer|egg/.test(l))return 'Layers';if(/broiler|meat/.test(l))return 'Broilers';if(/english|white/.test(l))return 'English chickens (white)';if(/mix|village|road/.test(l))return 'Mixed';return ''}
 function statusOfImp(v){var l=String(v||'').toLowerCase();if(/sold|sale/.test(l))return 'sold';if(/eat|eaten|slaughter|ate/.test(l))return 'eaten';if(/die|dead|death|lost/.test(l))return 'died';return 'active'}
 function sourceOfImp(v){var l=String(v||'').toLowerCase();if(/born/.test(l))return 'born';if(/bought|buy|purchas/.test(l))return 'bought';return 'existing'}
@@ -1758,17 +1741,14 @@ function impUndo(){
   db.tx.forEach(function(x){x.animalIds=(x.animalIds||[]).filter(function(i){return !gone[i]})});
   db.lastImport=null;save();confirmKey=null;render();toast('Import removed.');
 }
-function impStart(kind){imp={kind:kind||'animals',step:'pick',sheets:[],si:0,hdr:true,map:{},defSp:'',mode:'kind',batch:uid(),res:null,fname:'',err:''}}
+function impStart(kind){imp={kind:kind||'all',step:'pick',sheets:[],si:0,hdr:true,map:{},defSp:'',mode:'kind',batch:uid(),res:null,fname:'',err:'',pages:null,parts:[],ignored:[],pg:0}}
 function impLoad(sheets,fname){
   sheets=sheets.filter(function(s){return s.rows.some(function(r){return r&&r.some(function(c){return String(c).trim()!==''})})&&!/^how to use$/i.test(s.name)});
   if(!sheets.length){imp.err='That file has no rows I can read.';renderImport();return}
   imp.sheets=sheets;imp.si=0;imp.fname=fname||'';imp.err='';
-  if(imp.kind==='all'){
-    var pts=impBuildAll();
-    if(!pts.length){imp.err='I could not tell which sheets are which. Name them Animals, Money, Treatments, Schedules and Movements, or pick one kind above.';renderImport();return}
-    imp.step='preview';renderImport();return;
-  }
-  imp.step='map';impGuess();renderImport();
+  if(imp.kind==='all'){impPagesInit();imp.step='preview';renderImport();return}
+  var a=impAssign();if(a.found[imp.kind]!==undefined)imp.si=a.found[imp.kind];
+  imp.hdr=true;imp.step='map';impGuess();renderImport();
 }
 function impFile(file){
   imp.err='';var name=file.name||'file';
@@ -1784,15 +1764,168 @@ function impFile(file){
     rd.readAsText(file);
   }
 }
-function impSelect(field,label,heads,cur){
-  return '<label class="f">'+label+'<select data-imp="f_'+field+'"><option value="">Not in my file</option>'+heads.map(function(h,i){return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(h)+'</option>'}).join('')+'</select></label>';
+function impSelect(field,label,heads,cur,pk){
+  var at=pk?'data-ip="f" data-k="'+pk+'" data-f="'+field+'"':'data-imp="f_'+field+'"';
+  return '<label class="f">'+label+'<select '+at+'><option value="">Not in my file</option>'+heads.map(function(h,i){return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(h)+'</option>'}).join('')+'</select></label>';
+}
+function impMapHtml(k,t,m,mode,defSp,hdr,pk){
+  var A=function(n){return pk?'data-ip="'+n+'" data-k="'+pk+'"':'data-imp="'+n+'"'};
+  var h='<label class="pick" style="align-self:flex-start"><input type="checkbox" '+A('hdr')+(hdr?' checked':'')+'><span>First row is the headings</span></label>';
+  h+='<div class="small muted">I guessed from the headings. Change anything that is wrong.</div>';
+  if(k!=='money'){
+    IMPF[k].forEach(function(d){h+=impSelect(d[0],d[1],t.heads,m[d[0]],pk)});
+    if(k==='animals'||k==='movements')h+='<label class="f">Animal type for every row that has none<select '+A('defSp')+'><option value="">Not set</option>'+SPECIES.map(function(x){return '<option'+(defSp===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select></label>';
+  }else{
+    h+=impSelect('date','Date',t.heads,m.date,pk);
+    h+='<label class="f">How are money in and out shown?<select '+A('mode')+'><option value="kind"'+(mode==='kind'?' selected':'')+'>One amount column and a column saying in or out</option><option value="split"'+(mode==='split'?' selected':'')+'>Separate columns for money in and money out</option><option value="sign"'+(mode==='sign'?' selected':'')+'>One amount column, minus numbers are money out</option></select></label>';
+    if(mode==='split'){h+=impSelect('mIn','Money in column',t.heads,m.mIn,pk)+impSelect('mOut','Money out column',t.heads,m.mOut,pk)}
+    else{h+=impSelect('amount','Amount',t.heads,m.amount,pk);if(mode==='kind')h+=impSelect('kind','In or out',t.heads,m.kind,pk)}
+    ['cat','item','species','supplier','tags','cur','rate'].forEach(function(f){var d=IMPF.money.filter(function(x){return x[0]===f})[0];h+=impSelect(f,d[1],t.heads,m[f],pk)});
+  }
+  return h;
+}
+function impResHtml(k,r){
+  var h='';
+  if(!r.n){
+    h+='<div class="warnbox">Nothing could be added with these settings.</div>';
+  }else if(k==='treatments'||k==='schedules'||k==='movements'){
+    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>'+KINDNAME[k][0]+'</span></div><div class="tile"><b class="num">'+r.dup+'</b><span>Already there</span></div><div class="tile"><b class="num">'+r.skipped+'</b><span>Skipped</span></div></div>'+(r.note?'<div class="small muted">'+esc(r.note)+'</div>':'');
+  }else if(k==='animals'){
+    var parts=Object.keys(r.counts).map(function(sp){return r.counts[sp]+' '+sp.toLowerCase()}).join(', ');
+    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Records</span></div><div class="tile"><b class="num">'+Object.keys(r.counts).reduce(function(s,x){return s+r.counts[x]},0)+'</b><span>Animals</span></div><div class="tile"><b class="num">'+(r.dup+r.skipped)+'</b><span>Skipped</span></div></div><div class="small muted">'+esc(parts)+'</div>';
+  }else{
+    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Entries</span></div><div class="tile"><b class="num">'+moneyC(r.tin)+'</b><span>In</span></div><div class="tile"><b class="num">'+moneyC(r.tout)+'</b><span>Out</span></div></div><div class="small muted">'+dshort(r.dmin)+' to '+dshort(r.dmax)+'</div>';
+  }
+  if(r.dup)h+='<div class="small muted">'+r.dup+' rows were already in the app and will be skipped.</div>';
+  if(r.skipped&&k==='animals')h+='<div class="small muted">'+r.skipped+' empty rows were skipped.</div>';
+  r.warn.forEach(function(w){h+='<div class="warnbox">'+esc(w)+'</div>'});
+  if(r.sample.length)h+='<div class="tw"><table class="t"><thead><tr>'+r.head.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.sample.map(function(row){return '<tr>'+row.map(function(c){return '<td>'+esc(c)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div><div class="small muted">First '+r.sample.length+' of '+r.n+' shown.</div>';
+  return h;
+}
+
+/* ---------- whole workbook: one swipeable page per kind of record ---------- */
+var KINDS=['animals','money','treatments','schedules','movements'];
+var KLABEL={animals:['Animals','Your animals, one row per animal or group.'],money:['Money','Money in and out.'],treatments:['Treatments','Vaccines, dips, dewormers and other treatments given.'],schedules:['Schedules','When each treatment comes round again.'],movements:['Movements','Animals bought, born, sold, eaten at home or died.']};
+function headerKind(sh){
+  var rows=sh.rows.filter(function(r){return r&&r.some(function(c){return String(c).trim()!==''})});
+  if(!rows.length)return {k:'',score:0};
+  var hs=(rows[0]||[]).map(normH),best='',bs=0;
+  KINDS.forEach(function(k){
+    var sc=0;IMPF[k].forEach(function(d){if(hs.some(function(h){return h&&d[2].indexOf(h)>=0}))sc++});
+    if(sc>bs){bs=sc;best=k}
+  });
+  return {k:best,score:bs};
+}
+function impAssign(){
+  var found={},ignored=[];
+  imp.sheets.forEach(function(sh,i){var k=sheetKind(sh.name);if(k&&found[k]===undefined)found[k]=i});
+  imp.sheets.forEach(function(sh,i){
+    if(KINDS.some(function(k){return found[k]===i}))return;
+    if(/^(how to use|lists?)$/i.test(sh.name))return;
+    var g=headerKind(sh);
+    if(g.k&&g.score>=3&&found[g.k]===undefined){found[g.k]=i;return}
+    ignored.push(i);
+  });
+  return {found:found,ignored:ignored};
+}
+function impWith(k,fn){
+  var p=imp.pages[k],sv={kind:imp.kind,si:imp.si,map:imp.map,mode:imp.mode,hdr:imp.hdr,defSp:imp.defSp};
+  imp.kind=k;imp.si=p.si;imp.map=p.map;imp.mode=p.mode;imp.hdr=p.hdr;imp.defSp=p.defSp;
+  try{return fn()}
+  finally{p.map=imp.map;p.mode=imp.mode;imp.kind=sv.kind;imp.si=sv.si;imp.map=sv.map;imp.mode=sv.mode;imp.hdr=sv.hdr;imp.defSp=sv.defSp}
+}
+function impPageGuess(k){impWith(k,function(){impGuess()})}
+function impNeed(k,m,mode){
+  if(k==='animals'&&m.tag===''&&m.count==='')return 'Choose the column with the tag numbers, or the column with the number of animals.';
+  if(k==='money'){
+    if(m.date==='')return 'Choose the date column.';
+    if(mode==='split'?(m.mIn===''&&m.mOut===''):m.amount==='')return 'Choose the amount column.';
+    if(mode==='kind'&&m.kind==='')return 'Choose the column that says in or out, or pick another way in "How are money in and out shown?".';
+  }
+  if(k==='treatments'&&(m.date===''||m.product===''))return 'Choose the date and product columns.';
+  if(k==='schedules'&&(m.product===''||m.interval===''))return 'Choose the product column and the column with the days between doses.';
+  if(k==='movements'&&(m.date===''||m.event===''))return 'Choose the date column and the column saying what happened.';
+  return '';
+}
+function impPagesInit(){
+  var a=impAssign();imp.pages={};imp.ignored=a.ignored;
+  KINDS.forEach(function(k){
+    imp.pages[k]={si:a.found[k]===undefined?-1:a.found[k],hdr:true,map:{},mode:'kind',defSp:'',inc:true,open:false,res:null,err:''};
+    if(imp.pages[k].si>=0)impPageGuess(k);
+  });
+  imp.pg=0;
+  for(var i=0;i<KINDS.length;i++){if(imp.pages[KINDS[i]].si>=0){imp.pg=i;break}}
+  impRunAll();
+}
+function impRunAll(){
+  impExtra=[];
+  KINDS.forEach(function(k){
+    var p=imp.pages[k];p.res=null;p.err='';
+    if(p.si<0)return;
+    p.err=impNeed(k,p.map,p.mode);if(p.err)return;
+    p.res=impWith(k,impBuild);
+    if(k==='animals'&&p.inc)impExtra=p.res.animals.slice();
+  });
+  imp.parts=KINDS.filter(function(k){var p=imp.pages[k];return p.inc&&p.res&&p.res.n}).map(function(k){return {kind:k,res:imp.pages[k].res}});
+}
+function impPageHtml(k){
+  var p=imp.pages[k],kl=KLABEL[k],h='';
+  h+='<div class="sec"><h3>'+kl[0]+'</h3>'+(p.si>=0?'<label class="pick"><input type="checkbox" data-ip="inc" data-k="'+k+'"'+(p.inc?' checked':'')+'><span>Add these</span></label>':'')+'</div><div class="small muted">'+kl[1]+'</div>';
+  h+='<label class="f">Which sheet in your file?<select data-ip="sheet" data-k="'+k+'"><option value="-1">None. Leave this out</option>'+imp.sheets.map(function(sh,i){return '<option value="'+i+'"'+(p.si===i?' selected':'')+'>'+esc(sh.name)+'</option>'}).join('')+'</select></label>';
+  if(p.si<0){
+    h+='<div class="warnbox">I did not find a '+kl[0].toLowerCase()+' sheet in this file. If it is there under another name, choose it above. Otherwise swipe on, or get the blank template that has a sheet for each of the five.</div><button class="btn" type="button" data-a="imptpl">Download a blank template</button>';
+    return h;
+  }
+  if(p.err)h+='<div class="warnbox">'+esc(p.err)+'</div>';
+  else if(p.res)h+=impResHtml(k,p.res);
+  var t=impWith(k,impTable);
+  h+='<details class="mapd" data-k="'+k+'"'+(p.open||p.err?' open':'')+'><summary>Check the columns</summary><div class="stack" style="margin-top:10px">'+impMapHtml(k,t,p.map,p.mode,p.defSp,p.hdr,k)+'</div></details>';
+  return h;
+}
+function impTabsHtml(){
+  return KINDS.map(function(k,i){
+    var p=imp.pages[k],n=(p.si>=0&&p.inc&&p.res)?p.res.n:0,st=p.si<0?'none':(!p.inc?'skip':((p.err||!p.res||!p.res.n)?'warn':'ok'));
+    return '<button type="button" class="ptab" role="tab" data-a="ippage" data-i="'+i+'" aria-selected="'+(i===imp.pg)+'" data-s="'+st+'"><span>'+(k==='movements'?'Moves':KLABEL[k][0])+'</span><b class="num">'+(p.si<0?'-':n)+'</b></button>';
+  }).join('');
+}
+function impFootHtml(){
+  var tot=imp.parts.reduce(function(n,x){return n+x.res.n},0);
+  var h='';
+  if(tot)h+='<div class="small muted" style="text-align:center">'+imp.parts.map(function(x){return x.res.n+' '+KINDNAME[x.kind][0]}).join(' · ')+'</div>';
+  h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button>'+(tot?'<button class="btn pri" data-a="impgo" style="flex:2">Add everything ('+tot+')</button>':'')+'</div>';
+  return h;
+}
+function impBodyAll(){
+  var h='<div class="small muted">'+esc(imp.fname||'Pasted rows')+'. Swipe left or right to check each part. Nothing is added until you tap the button at the bottom.</div>';
+  h+='<div class="ptabs" id="impTabs" role="tablist">'+impTabsHtml()+'</div>';
+  h+='<div class="ipager" id="impPager">'+KINDS.map(function(k){return '<section class="ipage card" data-k="'+k+'" aria-label="'+KLABEL[k][0]+'">'+impPageHtml(k)+'</section>'}).join('')+'</div>';
+  if(imp.ignored&&imp.ignored.length)h+='<div class="small muted">Sheets I did not use: '+imp.ignored.map(function(i){return esc(imp.sheets[i].name)}).join(', ')+'. Pick one on a page above if it belongs there.</div>';
+  h+='<div class="impfoot" id="impFoot">'+impFootHtml()+'</div>';
+  return h;
+}
+function impRefreshAll(){
+  impRunAll();
+  KINDS.forEach(function(k){var sec=document.querySelector('.ipage[data-k="'+k+'"]');if(sec)sec.innerHTML=impPageHtml(k)});
+  impChrome();
+}
+function impChrome(){
+  var tb=document.getElementById('impTabs');if(tb)tb.innerHTML=impTabsHtml();
+  var ft=document.getElementById('impFoot');if(ft)ft.innerHTML=impFootHtml();
+}
+function impGoPage(i){
+  var pg=document.getElementById('impPager');if(!pg)return;
+  imp.pg=Math.max(0,Math.min(KINDS.length-1,i));imp.lock=true;
+  var calm=false;try{calm=window.matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
+  pg.scrollTo({left:imp.pg*pg.clientWidth,behavior:calm?'auto':'smooth'});
+  impChrome();
+  setTimeout(function(){if(imp)imp.lock=false},450);
 }
 function impBody(){
   var h='';
   if(imp.err)h+='<div class="warnbox" role="alert">'+esc(imp.err)+'</div>';
   if(imp.step==='pick'){
-    h+='<div class="small muted">Bring in records you already keep in Excel, Google Sheets or a CSV file. You see a preview before anything is added.</div>'+
-      '<label class="f">What are you bringing in?<select data-imp="kind"><option value="animals"'+(imp.kind==='animals'?' selected':'')+'>My animals</option><option value="money"'+(imp.kind==='money'?' selected':'')+'>Money in and out</option><option value="treatments"'+(imp.kind==='treatments'?' selected':'')+'>Treatments</option><option value="schedules"'+(imp.kind==='schedules'?' selected':'')+'>Health schedules</option><option value="movements"'+(imp.kind==='movements'?' selected':'')+'>Animal movements (bought, born, sold, died)</option><option value="all"'+(imp.kind==='all'?' selected':'')+'>A whole workbook: every sheet it recognises</option></select></label>'+
+    h+='<div class="small muted">Bring in records you already keep in Excel, Google Sheets or a CSV file. Pick your whole workbook and you can swipe through a preview of every sheet (animals, money, treatments, schedules, movements) before anything is added.</div>'+
+      '<label class="f">What are you bringing in?<select data-imp="kind"><option value="all"'+(imp.kind==='all'?' selected':'')+'>Everything in the workbook (recommended)</option><option value="animals"'+(imp.kind==='animals'?' selected':'')+'>Only my animals</option><option value="money"'+(imp.kind==='money'?' selected':'')+'>Only money in and out</option><option value="treatments"'+(imp.kind==='treatments'?' selected':'')+'>Only treatments</option><option value="schedules"'+(imp.kind==='schedules'?' selected':'')+'>Only health schedules</option><option value="movements"'+(imp.kind==='movements'?' selected':'')+'>Only animal movements (bought, born, sold, died)</option></select></label>'+
       '<label class="f">Choose a file (.xlsx or .csv)<input type="file" id="impSheet" accept=".xlsx,.xlsm,.csv,.tsv,.txt"></label>'+
       '<label class="f">Or paste rows copied from Excel or Google Sheets<textarea id="impPaste" rows="4" placeholder="Copy the cells, including the heading row, then paste here"></textarea></label>'+
       '<button class="btn" data-a="imppaste">Use the pasted rows</button>'+
@@ -1805,42 +1938,21 @@ function impBody(){
   if(imp.step==='map'){
     h+='<div class="small muted">'+esc(imp.fname||'Pasted rows')+' · '+t.data.length+' rows</div>';
     if(imp.sheets.length>1)h+='<label class="f">Sheet<select data-imp="si">'+imp.sheets.map(function(s,i){return '<option value="'+i+'"'+(i===imp.si?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select></label>';
-    h+='<label class="pick" style="align-self:flex-start"><input type="checkbox" data-imp="hdr"'+(imp.hdr?' checked':'')+'><span>First row is the headings</span></label>';
-    h+='<h3>Which column is which?</h3><div class="small muted">I guessed from the headings. Change anything that is wrong.</div>';
-    var m=imp.map;
-    if(imp.kind!=='money'){
-      IMPF[imp.kind].forEach(function(d){h+=impSelect(d[0],d[1],t.heads,m[d[0]])});
-      if(imp.kind==='animals'||imp.kind==='movements')h+='<label class="f">Animal type for every row that has none<select data-imp="defSp"><option value="">Not set</option>'+SPECIES.map(function(s){return '<option'+(imp.defSp===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select></label>';
-    }else{
-      h+=impSelect('date','Date',t.heads,m.date);
-      h+='<label class="f">How are money in and out shown?<select data-imp="mode"><option value="kind"'+(imp.mode==='kind'?' selected':'')+'>One amount column and a column saying in or out</option><option value="split"'+(imp.mode==='split'?' selected':'')+'>Separate columns for money in and money out</option><option value="sign"'+(imp.mode==='sign'?' selected':'')+'>One amount column, minus numbers are money out</option></select></label>';
-      if(imp.mode==='split'){h+=impSelect('mIn','Money in column',t.heads,m.mIn)+impSelect('mOut','Money out column',t.heads,m.mOut)}
-      else{h+=impSelect('amount','Amount',t.heads,m.amount);if(imp.mode==='kind')h+=impSelect('kind','In or out',t.heads,m.kind)}
-      ['cat','item','species','supplier','tags','cur','rate'].forEach(function(k){var d=IMPF.money.filter(function(x){return x[0]===k})[0];h+=impSelect(k,d[1],t.heads,m[k])});
-    }
+    h+='<h3>Which column is which?</h3>'+impMapHtml(imp.kind,t,imp.map,imp.mode,imp.defSp,imp.hdr,'');
     h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button><button class="btn pri" data-a="imppreview" style="flex:1">Preview</button></div>';
     return h;
   }
   var r=imp.res;
-  if(!r.n){
-    h+='<div class="warnbox">Nothing could be added with these settings.</div>';
-  }else if(imp.kind==='treatments'||imp.kind==='schedules'||imp.kind==='movements'){
-    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>'+KINDNAME[imp.kind][0]+'</span></div><div class="tile"><b class="num">'+r.dup+'</b><span>Already there</span></div><div class="tile"><b class="num">'+r.skipped+'</b><span>Skipped</span></div></div>'+(r.note?'<div class="small muted">'+esc(r.note)+'</div>':'');
-  }else if(imp.kind==='animals'){
-    var parts=Object.keys(r.counts).map(function(sp){return r.counts[sp]+' '+sp.toLowerCase()}).join(', ');
-    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Records</span></div><div class="tile"><b class="num">'+Object.keys(r.counts).reduce(function(s,k){return s+r.counts[k]},0)+'</b><span>Animals</span></div><div class="tile"><b class="num">'+(r.dup+r.skipped)+'</b><span>Skipped</span></div></div><div class="small muted">'+esc(parts)+'</div>';
-  }else{
-    h+='<div class="sum3"><div class="tile"><b class="num">'+r.n+'</b><span>Entries</span></div><div class="tile"><b class="num">'+moneyC(r.tin)+'</b><span>In</span></div><div class="tile"><b class="num">'+moneyC(r.tout)+'</b><span>Out</span></div></div><div class="small muted">'+dshort(r.dmin)+' to '+dshort(r.dmax)+'</div>';
-  }
-  if(r.dup)h+='<div class="small muted">'+r.dup+' rows were already in the app and will be skipped.</div>';
-  if(r.skipped&&imp.kind==='animals')h+='<div class="small muted">'+r.skipped+' empty rows were skipped.</div>';
-  r.warn.forEach(function(w){h+='<div class="warnbox">'+esc(w)+'</div>'});
-  if(r.sample.length)h+='<div class="tw"><table class="t"><thead><tr>'+r.head.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+r.sample.map(function(row){return '<tr>'+row.map(function(c){return '<td>'+esc(c)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div><div class="small muted">First '+r.sample.length+' of '+r.n+' shown.</div>';
+  h+=impResHtml(imp.kind,r);
   h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button>'+(r.n?'<button class="btn pri" data-a="impgo" style="flex:1">Add '+r.n+(imp.kind==='animals'?' records':' entries')+'</button>':'')+'</div>';
   return h;
 }
-function fImport(){if(!imp)impStart('animals');return head('Import from Excel or CSV')+'<div class="stack" id="impBody">'+impBody()+'</div>'}
-function renderImport(){var el=document.getElementById('impBody');if(el)el.innerHTML=impBody()}
+function fImport(){if(!imp)impStart('all');return head('Import from Excel or CSV')+'<div class="stack" id="impBody">'+impBody()+'</div>'}
+function renderImport(){
+  var el=document.getElementById('impBody');if(!el)return;
+  el.innerHTML=impBody();
+  var pg=document.getElementById('impPager');if(pg)pg.scrollLeft=imp.pg*pg.clientWidth;
+}
 function impTemplate(){
   var A=[['Tag','Type','Kind of chicken','Sex','Birth date','Dam (mother)','Sire (father)','Count','Status','Source']];
   var M=[['Date','In or out','Category','What for','Animal type','Animals (tags)','Amount','Currency','Rate (pula per rand)','Supplier or buyer']];
@@ -2334,7 +2446,7 @@ function shiftMonth(n){var y=+calMonth.slice(0,4),m=+calMonth.slice(5,7)-1+n;y+=
 
 function openSheet(kind,pre){
   cur={kind:kind,pre:pre||{}};
-  if(kind==='import')impStart('animals');
+  if(kind==='import')impStart('all');
   if(kind==='scan')scanStart();
   if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
   var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport,scan:fScan,repro:fRepro}[kind](cur.pre);
@@ -2569,20 +2681,13 @@ var actions={
  imptpl:function(){deliverFile('farm-book-template.xlsx',impTemplate(),function(){toast('Template saved. Fill it in, then import it.')})},
  impback:function(){if(!imp)return;imp.err='';if(imp.step==='preview'&&imp.kind!=='all')imp.step='map';else imp.step='pick';renderImport()},
  imppreview:function(){
-  var m=imp.map;imp.err='';
-  if(imp.kind==='animals'&&m.tag===''&&m.count===''){imp.err='Choose the column with the tag numbers, or the column with the number of animals.';renderImport();return}
-  if(imp.kind==='money'){
-    if(m.date===''){imp.err='Choose the date column.';renderImport();return}
-    if(imp.mode==='split'?(m.mIn===''&&m.mOut===''):m.amount===''){imp.err='Choose the amount column.';renderImport();return}
-    if(imp.mode==='kind'&&m.kind===''){imp.err='Choose the column that says in or out, or pick another way above.';renderImport();return}
-  }
-  if(imp.kind==='treatments'&&(m.date===''||m.product==='')){imp.err='Choose the date and product columns.';renderImport();return}
-  if(imp.kind==='schedules'&&(m.product===''||m.interval==='')){imp.err='Choose the product column and the column with the days between doses.';renderImport();return}
-  if(imp.kind==='movements'&&(m.date===''||m.event==='')){imp.err='Choose the date column and the column saying what happened.';renderImport();return}
+  imp.err=impNeed(imp.kind,imp.map,imp.mode);
+  if(imp.err){renderImport();return}
   impExtra=[];
   imp.res=impBuild();imp.step='preview';renderImport();
  },
  impgo:function(){impCommit()},
+ ippage:function(d){impGoPage(+d.i)},
  scnrm:function(d){scn.lines.splice(+d.i,1);renderScan()},
  scnadd:function(){scn.lines.push({d:'',a:0,cat:'Feed',sp:''});renderScan()},
  scnagain:function(){scanStart();renderScan()},
@@ -2628,6 +2733,16 @@ document.addEventListener('change',function(e){
     }
     return;
   }
+  if(el.dataset&&el.dataset.ip&&imp&&imp.pages){
+    var ipk=el.dataset.ip,pk=el.dataset.k,pp=imp.pages[pk];if(!pp)return;
+    if(ipk==='sheet'){pp.si=+el.value;pp.hdr=true;pp.open=false;if(pp.si>=0){pp.inc=true;impPageGuess(pk)}}
+    else if(ipk==='inc')pp.inc=el.checked;
+    else if(ipk==='hdr'){pp.hdr=el.checked;pp.open=true;impPageGuess(pk)}
+    else if(ipk==='mode'){pp.mode=el.value;pp.open=true}
+    else if(ipk==='defSp'){pp.defSp=el.value;pp.open=true}
+    else if(ipk==='f'){pp.map[el.dataset.f]=el.value===''?'':+el.value;pp.open=true}
+    impRefreshAll();return;
+  }
   if(el.dataset&&el.dataset.imp&&imp){
     var ik=el.dataset.imp;
     if(ik==='kind')imp.kind=el.value;
@@ -2651,6 +2766,14 @@ document.addEventListener('change',function(e){
     if(el.name==='repeat'){var hn=document.getElementById('repHint');if(hn)hn.hidden=(el.value==='none')}
   }
 });
+document.addEventListener('scroll',function(e){
+  var t=e.target;if(!imp||!t||t.id!=='impPager'||imp.lock)return;
+  var i=Math.max(0,Math.min(KINDS.length-1,Math.round(t.scrollLeft/Math.max(1,t.clientWidth))));
+  if(i!==imp.pg){imp.pg=i;impChrome()}
+},true);
+document.addEventListener('toggle',function(e){
+  var d=e.target;if(imp&&imp.pages&&d&&d.tagName==='DETAILS'&&d.dataset&&d.dataset.k&&imp.pages[d.dataset.k])imp.pages[d.dataset.k].open=d.open;
+},true);
 document.addEventListener('input',function(e){var el=e.target,f=el&&el.form;if(f&&/^(amount|price|cost|rate)$/.test(el.name))updCur(f)});
 document.addEventListener('pointermove',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 document.addEventListener('pointerdown',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
