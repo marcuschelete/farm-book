@@ -1248,9 +1248,9 @@ function deliverFile(name,blob,done){
 /* ---------- export to Excel ---------- */
 function excelBlob(){
   var D=function(s){return s?{d:s}:''};
-  var an=[['Tag or group','Type','Sex','Count','Birth date','Age','Source','Mother','Father','Status']].concat(db.animals.map(function(a){
+  var an=[['Tag or group','Type','Kind of chicken','Sex','Count','Birth date','Age','Source','Dam (mother)','Sire (father)','Status']].concat(db.animals.map(function(a){
     var m=aById(a.motherId),f=aById(a.fatherId);
-    return [a.tag||'',a.species,a.sex,a.qty,D(a.birth),ageStr(a.birth),SRC[a.source]||'',m?m.tag:'',f?f.tag:'',a.status==='active'?'On the farm':a.status];
+    return [a.tag||'',a.species,a.sub||'',a.sex,a.qty,D(a.birth),ageStr(a.birth),SRC[a.source]||'',m?m.tag:'',f?f.tag:'',a.status==='active'?'On the farm':a.status];
   }));
   var tx=[['Date','In or out','Category','What for','Animal type','Animals (tags)','Supplier or buyer','Amount (P)','Repeating']].concat(db.tx.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).map(function(x){
     var tags=(x.animalIds||[]).map(function(id){var a=aById(id);return a?a.tag:''}).filter(Boolean).join(', ');
@@ -1265,7 +1265,7 @@ function excelBlob(){
   var sc=[['Product','Kind','For','Every (days)','Last done','Next due','Dose']].concat(db.schedules.map(function(s){var p=prod(s.productId);return [p?p.name:'',p?p.type:'',s.target,s.interval,D(s.last),D(s.next),s.dose||'']}));
   var mv=[['Date','Event','Type','Number','Who','Price (P)','Note']].concat(db.stock.slice().sort(function(a,b){return a.date<b.date?1:-1}).map(function(e){return [D(e.date),EVT[e.type]||e.type,e.species,e.qty,e.who||'',e.price||'',e.note||'']}));
   return xlsxBlob([
-    {name:'Animals',rows:an,widths:[18,11,9,8,12,10,12,12,12,12]},
+    {name:'Animals',rows:an,widths:[18,11,18,9,8,12,10,12,14,14,12]},
     {name:'Money',rows:tx,widths:[12,9,12,28,12,22,20,12,10]},
     {name:'Profit per type',rows:pr,widths:[26,13,13,13]},
     {name:'Treatments',rows:tr,widths:[12,22,12,16,16,10,26]},
@@ -1312,13 +1312,16 @@ function printReport(per){
 var imp=null;
 var IMPF={
  animals:[
-  ['tag','Tag or ear number',['tag','eartag','tagno','tagnumber','earno','earnumber','id','animalid','number','no','name']],
+  ['tag','Tag or ear number',['tag','tagorgroup','eartag','tagno','tagnumber','earno','earnumber','id','animalid','number','no','name']],
   ['species','Type of animal',['species','type','kind','animaltype','animal','class','livestock']],
   ['sex','Sex',['sex','gender','mf']],
   ['birth','Birth date',['dateofbirth','birthdate','dob','birth','born','birthday']],
-  ['mother','Mother',['mother','dam','mum','mom']],
-  ['father','Father',['father','sire','dad']],
-  ['count','Number of animals',['count','qty','quantity','numberofanimals','noofanimals','head','total']]
+  ['mother','Dam (mother)',['mother','dam','mum','mom']],
+  ['father','Sire (father)',['father','sire','dad']],
+  ['count','Number of animals',['count','qty','quantity','numberofanimals','noofanimals','head','total']],
+  ['sub','Kind of chicken',['kindofchicken','chickenkind','subtype','breed','variety','purpose']],
+  ['source','Where it came from',['source','origin','acquired']],
+  ['status','Status',['status','state','condition']]
  ],
  money:[
   ['date','Date',['date','day','when']],
@@ -1329,7 +1332,10 @@ var IMPF={
   ['cat','Category',['category','cat','account','group']],
   ['item','What it was for',['description','item','details','whatfor','for','narration','particulars','note','notes']],
   ['species','Animal type',['animaltype','species','animal','livestock']],
-  ['supplier','Supplier or buyer',['supplier','buyer','customer','vendor','paidto','who','from','to']]
+  ['supplier','Supplier or buyer',['supplier','buyer','customer','vendor','paidto','who','from','to']],
+  ['tags','Animals (tags)',['animalstags','animaltags','tags','animalids','tag']],
+  ['cur','Currency',['currency','cur','ccy']],
+  ['rate','Rate (pula per rand)',['rate','exchangerate','fx','zarrate']]
  ]
 };
 function normH(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'')}
@@ -1402,8 +1408,8 @@ function spOf(s,def){
 function sexOf(s,group){
   var l=String(s||'').trim().toLowerCase();
   if(/^mix/.test(l))return group?'Mixed':'Unknown';
-  if(/^(f|fem|female|ewe|doe|nanny|cow|hen|heifer|girl|gilt)/.test(l))return 'Female';
-  if(/^(m|male|ram|buck|billy|bull|ox|steer|rooster|cock|boy|wether|tup)/.test(l))return 'Male';
+  if(/^(f|fem|female|ewe|doe|nanny|cow|hen|heifer|girl|gilt|sow|mare|jenny|duck)/.test(l))return 'Female';
+  if(/^(m|male|ram|buck|billy|bull|ox|steer|rooster|cock|boy|wether|tup|boar|stallion|gelding|jack|drake)/.test(l))return 'Male';
   return group?'Mixed':'Unknown';
 }
 function catOf(s,dir,text){
@@ -1421,12 +1427,15 @@ function catOf(s,dir,text){
   if(/labou?r|wage|salary|worker|herd|farm ?hand|casual/.test(l))return 'Labour';
   return 'Other';
 }
+function subOf(v){var l=String(v||'').toLowerCase();if(/layer|egg/.test(l))return 'Layers';if(/broiler|meat/.test(l))return 'Broilers';if(/english|white/.test(l))return 'English chickens (white)';if(/mix|village|road/.test(l))return 'Mixed';return ''}
+function statusOfImp(v){var l=String(v||'').toLowerCase();if(/sold|sale/.test(l))return 'sold';if(/eat|eaten|slaughter|ate/.test(l))return 'eaten';if(/die|dead|death|lost/.test(l))return 'died';return 'active'}
+function sourceOfImp(v){var l=String(v||'').toLowerCase();if(/born/.test(l))return 'born';if(/bought|buy|purchas/.test(l))return 'bought';return 'existing'}
 function impBuild(){
   var t=impTable(),m=imp.map,res={animals:[],stock:[],tx:[],skipped:0,dup:0,warn:[],sample:[],n:0},batch=imp.batch;
   var bad={};
   if(imp.kind==='animals'){
     var seenTag={},byTag={},counts={},gnames={},unres=0;
-    db.animals.forEach(function(a){if(a.kind==='individual'&&a.tag)byTag[a.species+'|'+a.tag.toLowerCase()]=a.id});
+    if(!db.example)db.animals.forEach(function(a){if(a.kind==='individual'&&a.tag)byTag[a.species+'|'+a.tag.toLowerCase()]=a.id});
     var rows=[];
     t.data.forEach(function(r){
       var tag=cellOf(r,m.tag),cnt=numOf(cellOf(r,m.count)),raw=cellOf(r,m.species),sp=spOf(raw,imp.defSp);
@@ -1435,17 +1444,19 @@ function impBuild(){
       if(raw&&sp==='Other'&&!/^other$/i.test(raw)&&Object.keys(bad).length<6)bad['"'+raw+'"']=1;
       var bd=m.birth!==''?dateOf(r[m.birth]):'',birthRaw=m.birth!==''?cellOf(r,m.birth):'';
       if(birthRaw&&!bd)res.warn.push('Birth date "'+birthRaw+'" was not understood for '+(tag||'a group')+' and was left empty.');
-      if(tag){
+      var sub=sp==='Chickens'?subOf(cellOf(r,m.sub)):'',st=statusOfImp(cellOf(r,m.status)),srcv=sourceOfImp(cellOf(r,m.source));
+      if(tag&&!(cnt>1)){
         var key=sp+'|'+tag.toLowerCase();
         if(byTag[key]||seenTag[key]){res.dup++;return}
         seenTag[key]=1;
-        var a={id:uid(),tag:tag,species:sp,sex:sexOf(cellOf(r,m.sex),false),qty:1,source:'existing',birth:bd,status:'active',kind:'individual',motherId:'',fatherId:'',imp:batch};
+        var a={id:uid(),tag:tag,species:sp,sub:sub,sex:sexOf(cellOf(r,m.sex),false),qty:1,source:srcv,birth:bd,status:st,kind:'individual',motherId:'',fatherId:'',imp:batch};
         byTag[key]=a.id;res.animals.push(a);rows.push({a:a,mo:cellOf(r,m.mother),fa:cellOf(r,m.father)});
       }else{
-        var sx=sexOf(cellOf(r,m.sex),true),nm=sp+(sx==='Mixed'?'':', '+sx.toLowerCase()+'s')+(bd?', born '+bd.slice(0,4):''),base=nm,k=2;
-        while(gnames[nm.toLowerCase()]||tagTaken(nm)){nm=base+' ('+(k++)+')'}
+        var sx=sexOf(cellOf(r,m.sex),true),nm=tag||(sp+(sub?' '+sub.toLowerCase():'')+(sx==='Mixed'?'':', '+sx.toLowerCase()+'s')+(bd?', born '+bd.slice(0,4):'')),base=nm,k=2;
+        if(tag&&((!db.example&&tagTaken(tag))||gnames[tag.toLowerCase()])){res.dup++;return}
+        while(gnames[nm.toLowerCase()]||(!db.example&&tagTaken(nm))){nm=base+' ('+(k++)+')'}
         gnames[nm.toLowerCase()]=1;
-        res.animals.push({id:uid(),tag:nm,species:sp,sex:sx,qty:Math.round(cnt),source:'existing',birth:bd,status:'active',kind:'group',motherId:'',fatherId:'',imp:batch});
+        res.animals.push({id:uid(),tag:nm,species:sp,sub:sub,sex:sx,qty:Math.round(cnt),source:srcv,birth:bd,status:st,kind:'group',motherId:'',fatherId:'',imp:batch});
       }
     });
     rows.forEach(function(r){
@@ -1456,13 +1467,13 @@ function impBuild(){
       });
     });
     if(unres)res.warn.push(unres+' mother or father tags were not found in the list, so those links were left empty.');
-    res.animals.forEach(function(a){counts[a.species]=(counts[a.species]||0)+a.qty});
-    Object.keys(counts).forEach(function(sp){res.stock.push({id:uid(),date:today(),type:'existing',species:sp,qty:counts[sp],who:'',price:0,note:'Imported from a spreadsheet',imp:batch})});
+    res.animals.forEach(function(a){if(a.status==='active')counts[a.species]=(counts[a.species]||0)+a.qty});
+    Object.keys(counts).forEach(function(sp){if(counts[sp]>0)res.stock.push({id:uid(),date:today(),type:'existing',species:sp,qty:counts[sp],who:'',price:0,note:'Imported from a spreadsheet',imp:batch})});
     res.n=res.animals.length;res.counts=counts;
     res.sample=res.animals.slice(0,8).map(function(a){var mo=aOrNew(a.motherId,res),fa=aOrNew(a.fatherId,res);return [a.tag,a.species,a.kind==='group'?a.sex+' · '+a.qty:a.sex,a.birth?dshort(a.birth):'',mo?mo.tag:'',fa?fa.tag:'']});
     res.head=['Tag or group','Type','Sex','Born','Mother','Father'];
   }else{
-    var have={};db.tx.forEach(function(x){have[x.date+'|'+x.dir+'|'+x.amount+'|'+(x.item||'')]=1});
+    var have={};if(!db.example)db.tx.forEach(function(x){have[x.date+'|'+x.dir+'|'+x.amount+'|'+(x.item||'')]=1});
     var noDate=0,noAmt=0,noDir=0,tin=0,tout=0,dmin='',dmax='';
     t.data.forEach(function(r){
       var ds=m.date!==''?dateOf(r[m.date]):'';
@@ -1489,10 +1500,16 @@ function impBuild(){
       var cat=catOf(catRaw,dir,item);
       if(catRaw){var list=dir==='in'?INCATS:OUTCATS,hit=list.filter(function(c){return c.toLowerCase()===catRaw.toLowerCase()})[0];if(hit)cat=hit}
       var sp=spRaw?spOf(spRaw,''):guessSpecies(item+' '+catRaw);
+      var zr=null;
+      if(/^(ZAR|R$|RAND)/.test(cellOf(r,m.cur).toUpperCase())){var rt=numOf(cellOf(r,m.rate));if(!(rt>0))rt=rateNow();zr={orig:amt,rate:rt};amt=round2(amt*rt)}
+      var ids=[];
+      cellOf(r,m.tags).split(/[,;]/).forEach(function(tg){tg=tg.trim().toLowerCase();if(!tg)return;var a=db.animals.filter(function(q){return isInd(q)&&q.tag.toLowerCase()===tg&&(!sp||q.species===sp)})[0];if(a){ids.push(a.id);if(!sp)sp=a.species}});
       var key=ds+'|'+dir+'|'+amt+'|'+item;
       if(have[key]){res.dup++;return}
       have[key]=1;
-      res.tx.push({id:uid(),date:ds,dir:dir,cat:cat,amount:Math.round(amt*100)/100,item:item,supplier:cellOf(r,m.supplier),note:'',species:sp,animalIds:[],imp:batch});
+      var nx={id:uid(),date:ds,dir:dir,cat:cat,amount:round2(amt),item:item,supplier:cellOf(r,m.supplier),note:'',species:sp,animalIds:ids,imp:batch};
+      if(zr){nx.cur='ZAR';nx.orig=zr.orig;nx.rate=zr.rate}
+      res.tx.push(nx);
       if(dir==='in')tin+=amt;else tout+=amt;
       if(!dmin||ds<dmin)dmin=ds;if(!dmax||ds>dmax)dmax=ds;
     });
@@ -1582,7 +1599,7 @@ function impBody(){
       h+='<label class="f">How are money in and out shown?<select data-imp="mode"><option value="kind"'+(imp.mode==='kind'?' selected':'')+'>One amount column and a column saying in or out</option><option value="split"'+(imp.mode==='split'?' selected':'')+'>Separate columns for money in and money out</option><option value="sign"'+(imp.mode==='sign'?' selected':'')+'>One amount column, minus numbers are money out</option></select></label>';
       if(imp.mode==='split'){h+=impSelect('mIn','Money in column',t.heads,m.mIn)+impSelect('mOut','Money out column',t.heads,m.mOut)}
       else{h+=impSelect('amount','Amount',t.heads,m.amount);if(imp.mode==='kind')h+=impSelect('kind','In or out',t.heads,m.kind)}
-      ['cat','item','species','supplier'].forEach(function(k){var d=IMPF.money.filter(function(x){return x[0]===k})[0];h+=impSelect(k,d[1],t.heads,m[k])});
+      ['cat','item','species','supplier','tags','cur','rate'].forEach(function(k){var d=IMPF.money.filter(function(x){return x[0]===k})[0];h+=impSelect(k,d[1],t.heads,m[k])});
     }
     h+='<div class="row"><button class="btn" data-a="impback" style="flex:1">Back</button><button class="btn pri" data-a="imppreview" style="flex:1">Preview</button></div>';
     return h;
@@ -1606,10 +1623,10 @@ function impBody(){
 function fImport(){if(!imp)impStart('animals');return head('Import from Excel or CSV')+'<div class="stack" id="impBody">'+impBody()+'</div>'}
 function renderImport(){var el=document.getElementById('impBody');if(el)el.innerHTML=impBody()}
 function impTemplate(){
-  var A=[['Tag','Type','Sex','Birth date','Mother','Father','Count']];
-  var M=[['Date','In or out','Category','What for','Animal type','Amount','Supplier or buyer']];
+  var A=[['Tag','Type','Kind of chicken','Sex','Birth date','Dam (mother)','Sire (father)','Count','Status','Source']];
+  var M=[['Date','In or out','Category','What for','Animal type','Animals (tags)','Amount','Currency','Rate (pula per rand)','Supplier or buyer']];
   var H=[['How to use this template'],['Animals sheet: one row for each animal you want to follow by tag. For animals you do not tag, leave Tag empty and put the number in Count.'],['Money sheet: one row for each payment. In or out is In or Out. Dates like 2026-03-14 or 14/03/2026 both work.'],['Delete nothing else. Headings can be in any order, and you can add your own columns.']];
-  return xlsxBlob([{name:'Animals',rows:A,widths:[14,12,10,13,12,12,9]},{name:'Money',rows:M,widths:[13,11,14,26,13,10,20]},{name:'How to use',rows:H,widths:[110]}]);
+  return xlsxBlob([{name:'Animals',rows:A,widths:[14,12,18,10,13,14,14,9,12,12]},{name:'Money',rows:M,widths:[13,11,14,26,13,16,10,10,18,20]},{name:'How to use',rows:H,widths:[110]}]);
 }
 
 /* ---------- scan a receipt (Gemini through Firebase AI Logic) ---------- */
