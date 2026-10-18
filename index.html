@@ -219,18 +219,23 @@ table.t tr.clk:hover{background:var(--soft)}
 (function(){
 'use strict';
 var KEY='farmbook.v1';
-var SPECIES=['Cattle','Goats','Sheep','Chickens','Other'];
+var SPECIES=['Cattle','Goats','Sheep','Pigs','Horses','Donkeys','Chickens','Ducks','Turkeys','Rabbits','Other'];
+var CORESP=['Cattle','Goats','Sheep','Chickens'];
+var POULTRY=['Chickens','Ducks','Turkeys','Rabbits'];
+var CHKIND=['Layers','Broilers','English chickens (white)','Mixed'];
+var DEFRATE=0.83;
 var TYPES=['Vaccine','Dewormer','Dip / tick','Spray','Medicine'];
 var OUTCATS=['Feed','Health','Animals','Equipment','Labour','Other'];
 var INCATS=['Animal sales','Eggs','Milk','Other'];
 var EVT={bought:'Bought',born:'Born',existing:'Already on the farm',sold:'Sold',eaten:'Eaten at home',died:'Died'};
 var FREQ={monthly:'Every month',fortnightly:'Every 2 weeks',weekly:'Every week'};
 var SRC={born:'born here',bought:'bought',existing:'on the farm'};
-var SPCOL={Cattle:'--s1',Goats:'--s2',Sheep:'--s3',Chickens:'--s4',Other:'--s5','':'--muted'};
+var SPCOL={Cattle:'--s1',Goats:'--s2',Sheep:'--s3',Chickens:'--s4',Pigs:'--s5',Horses:'--s6',Donkeys:'--s7',Ducks:'--s8',Turkeys:'--s6',Rabbits:'--s7',Other:'--muted','':'--muted'};
 var NEEDSP=['Animal sales','Eggs','Milk'];
 var POPR={'3m':91,'1y':365,'all':0};
 var SORT={animals:{k:'tag',d:1},tx:{k:'date',d:-1}};
 var splitShared=false,popRange='1y',popHide={};
+var reproSp='',reproN=10,reproRole='dam';
 var db, tab='home', cur=null, flt='All', showPast=false, period='month', confirmKey=null, calMonth='', calDay='';
 
 function p2(n){return (n<10?'0':'')+n}
@@ -250,11 +255,12 @@ function ageStr(b){if(!b)return '';var d=diff(b,today());if(d<0)return '';if(d<6
 function E(s){return {err:s}}
 
 /* ---------- storage ---------- */
-function blank(){return {v:2,example:false,created:today(),lastBackup:'',animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[],recurring:[]}}
+function blank(){return {v:2,example:false,created:today(),lastBackup:'',rate:0,animals:[],products:[],schedules:[],treatments:[],stock:[],tx:[],recurring:[]}}
 function fix(o){
-  o.created=o.created||today();o.lastBackup=o.lastBackup||'';
+  o.created=o.created||today();o.lastBackup=o.lastBackup||'';o.rate=+o.rate>0?+o.rate:0;
   ['products','schedules','treatments','stock','tx','recurring'].forEach(function(k){if(!Array.isArray(o[k]))o[k]=[]});
   o.animals.forEach(function(a){
+    if(typeof a.sub!=='string')a.sub='';
     if(!a.kind)a.kind=(a.qty===1&&a.tag)?'individual':'group';
     if(a.kind==='individual'){a.qty=1;a.motherId=a.motherId||'';a.fatherId=a.fatherId||'';if(!a.sex||a.sex==='Mixed')a.sex='Unknown'}
   });
@@ -291,7 +297,14 @@ function seed(){
   var dam=an('G-224','Goats','Female',1,'existing',addDays(t,-900),'individual');
   var sire=an('G-337','Goats','Male',1,'existing',addDays(t,-1100),'individual');
   an('G-4567','Goats','Male',1,'born',addDays(t,-70),'individual',dam.id,sire.id);
-  an('Flock A','Sheep','Mixed',25,'bought','');an('Layers','Chickens','Female',60,'bought','');
+  an('Flock A','Sheep','Mixed',25,'bought','');an('Layers','Chickens','Female',60,'bought','').sub='Layers';
+  an('Broilers','Chickens','Mixed',40,'born',addDays(t,-25)).sub='English chickens (white)';
+  var d2=an('G-118','Goats','Female',1,'existing',addDays(t,-1300),'individual');
+  an('G-3001','Goats','Male',1,'born',addDays(t,-800),'individual',d2.id,sire.id);an('G-3402','Goats','Female',1,'born',addDays(t,-430),'individual',d2.id,sire.id);an('G-4300','Goats','Female',1,'born',addDays(t,-60),'individual',d2.id,sire.id);
+  an('G-4100','Goats','Male',1,'born',addDays(t,-520),'individual',dam.id,sire.id).status='died';
+  an('G-300','Goats','Female',1,'existing',addDays(t,-400),'individual');
+  var cw=an('Cow 07','Cattle','Female',1,'existing',addDays(t,-2000),'individual');
+  an('C-21','Cattle','Male',1,'born',addDays(t,-900),'individual',cw.id,'').status='died';an('C-22','Cattle','Female',1,'born',addDays(t,-450),'individual',cw.id,'').status='died';an('C-23','Cattle','Female',1,'born',addDays(t,-90),'individual',cw.id,'');
   function pr(n,ty,w){var p={id:uid(),name:n,type:ty,withdrawal:w};d.products.push(p);return p}
   function sc(p,target,iv,dose,last){d.schedules.push({id:uid(),productId:p.id,target:target,interval:iv,dose:dose,last:last,next:addDays(last,iv)})}
   var fmd=pr('FMD vaccine','Vaccine',0), dip=pr('Tick dip','Dip / tick',7), iver=pr('Ivermectin','Dewormer',28), nc=pr('Newcastle vaccine','Vaccine',0), pk=pr('Pulpy kidney vaccine','Vaccine',0);
@@ -331,7 +344,32 @@ function isInd(a){return a.kind==='individual'}
 function aLabel(a){return a.tag||(a.species+' group')}
 function aById(id){return id?db.animals.find(function(a){return a.id===id}):null}
 function tagTaken(tag,exceptId){var k=tag.trim().toLowerCase();return db.animals.some(function(a){return a.id!==exceptId&&a.tag&&a.tag.trim().toLowerCase()===k})}
-function parentsLine(a){var m=aById(a.motherId),f=aById(a.fatherId),p=[];if(m)p.push('Mother '+m.tag);if(f)p.push('Father '+f.tag);return p.join(' · ')}
+function parentsLine(a){var m=aById(a.motherId),f=aById(a.fatherId),p=[];if(m)p.push('Dam (mother) '+m.tag);if(f)p.push('Sire (father) '+f.tag);return p.join(' · ')}
+function spLine(a){return a.species+(a.sub?' ('+a.sub+')':'')}
+function shownSp(){return SPECIES.filter(function(s){return CORESP.indexOf(s)>=0||count(s)>0})}
+function round2(n){return Math.round(n*100)/100}
+function rateNow(){return db.rate>0?db.rate:DEFRATE}
+function cmeta(f,amt){
+  if(f.cur==='ZAR'){var r=+f.rate;if(!(r>0))return {err:'Enter how many pula one rand is worth.'};r=Math.round(r*10000)/10000;db.rate=r;return {amount:round2(amt*r),cur:'ZAR',orig:amt,rate:r}}
+  return {amount:amt,cur:''};
+}
+function setCur(o,m,field){
+  o[field||'amount']=m.amount;
+  if(m.cur){o.cur='ZAR';o.orig=m.orig;o.rate=m.rate}else{delete o.cur;delete o.orig;delete o.rate}
+}
+function curNote(x){return x&&x.cur==='ZAR'?'R '+num2(x.orig)+' at '+x.rate:''}
+function origOf(o,field){return o&&o.cur==='ZAR'?o.orig:(o&&o[field||'amount']?o[field||'amount']:'')}
+function curBlock(o){
+  var z=!!(o&&o.cur==='ZAR');
+  return '<div class="two">'+fld('Currency','<select name="cur">'+opts([['BWP','Pula (P)'],['ZAR','Rand (R)']],z?'ZAR':'BWP')+'</select>')+'<div class="ratew"'+(z?'':' hidden')+'>'+fld('1 rand = how many pula','<input name="rate" type="number" min="0" step="0.0001" inputmode="decimal" value="'+(z?o.rate:rateNow())+'">')+'</div></div><div class="small muted curhint" hidden></div>';
+}
+function updCur(form){
+  var fe=form.elements;if(!fe.cur)return;
+  var z=fe.cur.value==='ZAR',w=form.querySelector('.ratew'),h=form.querySelector('.curhint');
+  if(w)w.hidden=!z;
+  var a=fe.amount||fe.price||fe.cost,v=a?+a.value:0,r=fe.rate?+fe.rate.value:0;
+  if(h){if(z&&v>0&&r>0){h.hidden=false;h.textContent='R '+num2(v)+' is saved as '+money(round2(v*r))+'. The app counts everything in pula.'}else h.hidden=true}
+}
 function tLabel(t){var a=t.animalId?aById(t.animalId):null;return a?aLabel(a):t.target}
 function prod(id){return db.products.find(function(p){return p.id===id})}
 function sdays(s){return diff(today(),s.next)}
@@ -444,13 +482,14 @@ function linkLegacy(t){
   if(m)t.txId=m.id;
 }
 function txScope(t){return {species:(t.target&&t.target!=='All')?t.target:'',animalIds:t.animalId?[t.animalId]:[]}}
-function syncTreatCost(t,cost,name){
+function syncTreatCost(t,cost,name,cm){
+  cm=cm||{amount:cost,cur:''};
   var x=t.txId?db.tx.find(function(y){return y.id===t.txId}):null,sc=txScope(t);
   if(cost>0){
-    if(x){x.amount=cost;x.date=t.date;x.item=name;x.species=sc.species;x.animalIds=sc.animalIds}
-    else if(cost!==(t.cost||0)||!t.cost){var id=uid();db.tx.push({id:id,date:t.date,dir:'out',cat:'Health',amount:cost,item:name,supplier:'',note:'',species:sc.species,animalIds:sc.animalIds});t.txId=id}
+    if(x){setCur(x,cm);x.date=t.date;x.item=name;x.species=sc.species;x.animalIds=sc.animalIds}
+    else if(cost!==(t.cost||0)||!t.cost){var id=uid();var nx={id:id,date:t.date,dir:'out',cat:'Health',amount:cost,item:name,supplier:'',note:'',species:sc.species,animalIds:sc.animalIds};setCur(nx,cm);db.tx.push(nx);t.txId=id}
   }else if(x){db.tx=db.tx.filter(function(y){return y!==x});t.txId=''}
-  t.cost=cost;
+  setCur(t,cm,'cost');
 }
 function recalcSchedule(pid,target){
   var s=db.schedules.find(function(x){return x.productId===pid&&x.target===target});if(!s)return;
@@ -490,6 +529,12 @@ function guessSpecies(s){
   if(/\b(goats?|kids?|nanny|billy)\b/.test(s))return 'Goats';
   if(/\b(sheep|lambs?|rams?|ewes?)\b/.test(s))return 'Sheep';
   if(/\b(cattle|cows?|bulls?|oxen|ox|calf|calves|heifers?|steers?)\b/.test(s))return 'Cattle';
+  if(/\b(pigs?|piglets?|sows?|boars?|hogs?|pork)\b/.test(s))return 'Pigs';
+  if(/\b(horses?|foals?|mares?|stallions?|geldings?)\b/.test(s))return 'Horses';
+  if(/\b(donkeys?|jacks?|jennets?)\b/.test(s))return 'Donkeys';
+  if(/\b(ducks?|ducklings?|geese|goose)\b/.test(s))return 'Ducks';
+  if(/\b(turkeys?)\b/.test(s))return 'Turkeys';
+  if(/\b(rabbits?|bunnies|bunny)\b/.test(s))return 'Rabbits';
   if(/\b(chickens?|hens?|layers?|broilers?|eggs?|roosters?|birds?|chicks?)\b/.test(s))return 'Chickens';
   return '';
 }
@@ -708,7 +753,7 @@ function cCal(){return '<div class="card"><h2>Calendar</h2><div class="stack cal
 function vHome(){
   if(isWide())return vHomeWide();
   var h='';
-  var tiles=SPECIES.filter(function(s){return count(s)>0||s!=='Other'}).map(function(s){return '<div class="tile"><b>'+count(s)+'</b><span>'+s+'</span></div>'}).join('');
+  var tiles=shownSp().map(function(s){return '<div class="tile"><b>'+count(s)+'</b><span>'+s+'</span></div>'}).join('');
   h+='<div class="grid">'+tiles+'</div>';
   h+=cAttention(6);
   var tm=totals('month'),net=tm.tin-tm.tout;
@@ -724,7 +769,7 @@ function vHome(){
 function vHomeWide(){
   var tm=totals('month'),net=tm.tin-tm.tout,soon=db.schedules.filter(function(s){return sdays(s)<=7}).length;
   function kp(v,l,c){return '<div class="tile"><b class="num"'+(c?' style="color:var(--'+c+')"':'')+'>'+v+'</b><span>'+l+'</span></div>'}
-  var k=kp(count(),'Animals')+SPECIES.slice(0,4).map(function(s){return kp(count(s),s)}).join('')+
+  var k=kp(count(),'Animals')+shownSp().slice(0,6).map(function(s){return kp(count(s),s)}).join('')+
     kp(moneyC(tm.tout),'Spent this month')+kp(moneyC(tm.tin),'Sales this month')+kp(moneyC(net),'Net this month',net<0?'bad':'good')+kp(soon,'Treatments due in 7 days',soon?'warn':'');
   var h='<div class="kpis">'+k+'</div>';
   h+='<div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn pri" data-a="open" data-k="event">Animal event</button><button class="btn pri" data-a="open" data-k="treat">Log treatment</button><button class="btn pri" data-a="open" data-k="tx">Add money in or out</button></div>';
@@ -738,26 +783,33 @@ function vHomeWide(){
   return h;
 }
 
+function chickBreak(){
+  var m={};active().filter(function(a){return a.species==='Chickens'}).forEach(function(a){var k=a.sub||'Kind not set';m[k]=(m[k]||0)+a.qty});
+  var ks=Object.keys(m);
+  return ks.length?'<div class="small muted">'+ks.map(function(k){return esc(k)+': <b>'+m[k]+'</b>'}).join(' · ')+'</div>':'';
+}
 function vAnimals(){
   var w=isWide();
   var h='<div class="row"><h2>Animals</h2><button class="btn pri" data-a="open" data-k="event">+ Event</button></div>';
   h+=cPop();
-  h+='<div class="chips">'+['All'].concat(SPECIES.slice(0,4)).map(function(s){return '<button class="chip" aria-pressed="'+(flt===s)+'" data-a="filter" data-v="'+s+'">'+s+(s==='All'?'':' '+count(s))+'</button>'}).join('')+'</div>';
+  h+=cRepro();
+  h+='<div class="chips">'+['All'].concat(shownSp()).map(function(s){return '<button class="chip" aria-pressed="'+(flt===s)+'" data-a="filter" data-v="'+s+'">'+s+(s==='All'?'':' '+count(s))+'</button>'}).join('')+'</div>';
+  if(flt==='Chickens')h+=chickBreak();
   var rows=db.animals.filter(function(a){return (flt==='All'||a.species===flt)&&(showPast||a.status==='active')});
   var toggle='<button class="btn sm" data-a="past" style="align-self:flex-start">'+(showPast?'Hide':'Show')+' sold, eaten and dead</button>';
   if(w){
     var G={tag:function(a){return aLabel(a).toLowerCase()},species:function(a){return a.species},sex:function(a){return a.sex},age:function(a){return a.birth||'~'},source:function(a){return a.source},mother:function(a){var m=aById(a.motherId);return m?m.tag.toLowerCase():'~'},father:function(a){var f=aById(a.fatherId);return f?f.tag.toLowerCase():'~'},qty:function(a){return a.qty},status:function(a){return a.status}};
     var sr=sortBy(rows,'animals',G);
-    h+='<div class="card"><div class="tw"><table class="t"><thead><tr>'+th('animals','tag','Tag or group')+th('animals','species','Type')+th('animals','sex','Sex')+th('animals','age','Age')+th('animals','source','Source')+th('animals','mother','Mother')+th('animals','father','Father')+th('animals','qty','Count',true)+th('animals','status','Status')+'</tr></thead><tbody>'+
+    h+='<div class="card"><div class="tw"><table class="t"><thead><tr>'+th('animals','tag','Tag or group')+th('animals','species','Type')+th('animals','sex','Sex')+th('animals','age','Age')+th('animals','source','Source')+th('animals','mother','Dam (mother)')+th('animals','father','Sire (father)')+th('animals','qty','Count',true)+th('animals','status','Status')+'</tr></thead><tbody>'+
       (sr.length?sr.map(function(a){
         var ind=isInd(a),m=aById(a.motherId),f=aById(a.fatherId);
-        return '<tr class="clk" data-a="animal" data-id="'+a.id+'"><td><button class="lnk" data-a="animal" data-id="'+a.id+'">'+esc(aLabel(a))+'</button></td><td>'+esc(a.species)+'</td><td>'+esc(ind?(a.sex!=='Unknown'?a.sex:'–'):(a.sex!=='Mixed'?a.sex:'Mixed'))+'</td><td>'+esc(ageStr(a.birth)||'–')+'</td><td>'+esc(SRC[a.source]||'')+'</td><td>'+(m?esc(m.tag):'–')+'</td><td>'+(f?esc(f.tag):'–')+'</td><td class="r num">'+a.qty+'</td><td>'+(a.status==='active'?'<span class="pill good">on farm</span>':'<span class="pill">'+a.status+'</span>')+'</td></tr>';
+        return '<tr class="clk" data-a="animal" data-id="'+a.id+'"><td><button class="lnk" data-a="animal" data-id="'+a.id+'">'+esc(aLabel(a))+'</button></td><td>'+esc(spLine(a))+'</td><td>'+esc(ind?(a.sex!=='Unknown'?a.sex:'–'):(a.sex!=='Mixed'?a.sex:'Mixed'))+'</td><td>'+esc(ageStr(a.birth)||'–')+'</td><td>'+esc(SRC[a.source]||'')+'</td><td>'+(m?esc(m.tag):'–')+'</td><td>'+(f?esc(f.tag):'–')+'</td><td class="r num">'+a.qty+'</td><td>'+(a.status==='active'?'<span class="pill good">on farm</span>':'<span class="pill">'+a.status+'</span>')+'</td></tr>';
       }).join(''):'<tr><td colspan="9" class="empty">No animals here yet. Add some with an Event.</td></tr>')+
       '</tbody></table></div>'+toggle+'</div>';
   }else{
     h+='<div class="card">'+list(rows.map(function(a){
       var ind=isInd(a), sx=ind?(a.sex!=='Unknown'?a.sex:''):(a.sex!=='Mixed'?a.sex:'');
-      var meta=[a.species,sx,ageStr(a.birth),SRC[a.source]||''].filter(Boolean).join(' · ');
+      var meta=[spLine(a),sx,ageStr(a.birth),SRC[a.source]||''].filter(Boolean).join(' · ');
       var par=ind?parentsLine(a):'';
       return '<button class="item" data-a="animal" data-id="'+a.id+'"><div class="main"><div class="t">'+esc(aLabel(a))+'</div><div class="s">'+esc(meta)+'</div>'+(par?'<div class="s">'+esc(par)+'</div>':'')+'</div>'+(a.status!=='active'?'<span class="pill">'+a.status+'</span>':(ind?'':'<b class="num">'+a.qty+'</b>'))+'</button>';
     }),'No animals here yet. Add some with an Event (Bought, Born or Already on the farm).')+toggle+'</div>';
@@ -775,7 +827,7 @@ function vHealth(){
   }),'No schedules. Add one for each vaccine, dewormer or dip.')+'</div>';
   var hist=db.treatments.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,15);
   var c2='<div class="card"><h2>History</h2>'+list(hist.map(function(t){var p=prod(t.productId);
-    return '<button class="item" data-a="treatedit" data-id="'+t.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(tLabel(t))+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+(t.note?' · '+esc(t.note):'')+'</div></div>'+(t.cost?'<span class="num">'+money(t.cost)+'</span>':'')+'</button>'}),'Nothing logged yet.')+'</div>';
+    return '<button class="item" data-a="treatedit" data-id="'+t.id+'"><div class="main"><div class="t">'+esc(p?p.name:'?')+' · '+esc(tLabel(t))+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+(t.note?' · '+esc(t.note):'')+(t.cur==='ZAR'?' · '+esc(curNote({cur:'ZAR',orig:t.orig,rate:t.rate})):'')+'</div></div>'+(t.cost?'<span class="num">'+money(t.cost)+'</span>':'')+'</button>'}),'Nothing logged yet.')+'</div>';
   return h+(isWide()?'<div class="cols2">'+c1+c2+'</div>':c1+c2);
 }
 
@@ -797,12 +849,12 @@ function cTx(){
     var rows=sortBy(tx,'tx',G).slice(0,300);
     return '<div class="card"><h2>Transactions</h2><div class="tw"><table class="t"><thead><tr>'+th('tx','date','Date')+th('tx','item','What for')+th('tx','cat','Category')+th('tx','sp','Animal type')+th('tx','sup','Supplier or buyer')+th('tx','amt','Amount (P)',true)+'</tr></thead><tbody>'+
       (rows.length?rows.map(function(x){
-        return '<tr class="clk" data-a="txedit" data-id="'+x.id+'"><td>'+dshort(x.date)+'</td><td><button class="lnk" data-a="txedit" data-id="'+x.id+'">'+esc(x.item||x.cat)+'</button>'+(x.recId?' <span class="pill">repeating</span>':'')+'</td><td>'+esc(x.cat)+'</td><td>'+esc(x.species||'–')+'</td><td>'+esc(x.supplier||'–')+'</td><td class="r num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+num2(x.amount)+'</td></tr>';
+        return '<tr class="clk" data-a="txedit" data-id="'+x.id+'"><td>'+dshort(x.date)+'</td><td><button class="lnk" data-a="txedit" data-id="'+x.id+'">'+esc(x.item||x.cat)+'</button>'+(x.recId?' <span class="pill">repeating</span>':'')+(x.cur==='ZAR'?' <span class="pill">'+esc(curNote(x))+'</span>':'')+'</td><td>'+esc(x.cat)+'</td><td>'+esc(x.species||'–')+'</td><td>'+esc(x.supplier||'–')+'</td><td class="r num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+num2(x.amount)+'</td></tr>';
       }).join(''):'<tr><td colspan="6" class="empty">Nothing recorded in this period.</td></tr>')+'</tbody></table></div></div>';
   }
   tx=tx.sort(function(a,b){return a.date<b.date?1:-1}).slice(0,30);
   return '<div class="card"><h2>Transactions</h2>'+list(tx.map(function(x){
-    return '<button class="item" data-a="txedit" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
+    return '<button class="item" data-a="txedit" data-id="'+x.id+'"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+dshort(x.date)+' · '+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+(x.cur==='ZAR'?' · '+esc(curNote(x)):'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></button>'}),'Nothing recorded in this period.')+'</div>';
 }
 function vMoney(){
   var T=totals(period),net=T.tin-T.tout,w=isWide();
@@ -1578,7 +1630,7 @@ function scanInit(){
 }
 function scanPrompt(){
   return 'You read shop receipts and invoices for a small farm in Botswana. Look at the photo and answer with JSON only, in exactly this shape:\n'+
-  '{"supplier":string or null,"date":"YYYY-MM-DD" or null,"total":number or null,"lines":[{"description":string,"amount":number,"category":"Feed"|"Health"|"Animals"|"Equipment"|"Labour"|"Other","species":"Cattle"|"Goats"|"Sheep"|"Chickens"|"Other"|""}]}\n'+
+  '{"supplier":string or null,"date":"YYYY-MM-DD" or null,"total":number or null,"lines":[{"description":string,"amount":number,"category":"Feed"|"Health"|"Animals"|"Equipment"|"Labour"|"Other","species":'+SPECIES.map(function(s){return '"'+s+'"'}).join('|')+'|""}]}\n'+
   'Rules: supplier is the shop or seller name. If the date is day/month/year or month/day/year and not obvious, assume day first unless a number above 12 shows otherwise. '+
   '"amount" is what was paid for that line in total, as a plain number with no currency sign. Skip lines that are not purchases (headings, change, card details). '+
   'Put VAT or tax on its own line only if it is shown as a separate amount. '+
@@ -1772,7 +1824,7 @@ function fTreat(pre){
    fld('Product','<input name="product" list="plist" required placeholder="e.g. Ivermectin" value="'+esc(p?p.name:'')+'">')+plist()+
    '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('Given to','<select name="target">'+targetOpts(sel,selA)+'</select>')+'</div>'+
    '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head" value="'+esc(t?t.dose:(s?s.dose:''))+'">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" value="'+(t?(t.withdrawal||0):(p?p.withdrawal:''))+'">','before slaughter or sale')+'</div>'+
-   fld('Cost','<input name="cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="'+(t&&t.cost?t.cost:'')+'">','optional, counts as Health spending')+
+   fld('Cost','<input name="cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="'+(t&&t.cost?origOf(t,'cost'):'')+'">','optional, counts as Health spending')+curBlock(t&&t.cost?t:null)+
    fld('Notes','<input name="note" placeholder="Optional" value="'+esc(t?t.note:'')+'">')+
    '<button class="btn pri" type="submit">'+(t?'Save changes':'Save treatment')+'</button></form>'+(t?rmBlock('treatments',t.id,'this treatment'):'');
 }
@@ -1793,14 +1845,15 @@ function fEvent(){
   return head('Animal event')+'<form data-form="event" id="evForm">'+
    '<div class="two">'+fld('What happened','<select name="type">'+opts(Object.keys(EVT).map(function(k){return [k,EVT[k]]}),'bought')+'</select>')+fld('Date','<input type="date" name="date" value="'+today()+'" required>')+'</div>'+
    '<div data-for="bought born existing"><div class="two">'+fld('Species','<select name="species">'+opts(SPECIES,'Goats')+'</select>')+fld('Record as','<select name="kind"><option value="individual">One animal</option><option value="group">A group</option></select>')+'</div></div>'+
+   '<div id="subWrap" hidden>'+fld('Kind of chicken','<select name="sub">'+opts([['','Not set']].concat(CHKIND.map(function(k){return [k,k]})),'')+'</select>','layers lay eggs, broilers are for meat. English chickens are the plain white ones')+'</div>'+
    '<div data-for="bought born existing" data-kind="individual" class="stack">'+
      fld('Tag number','<input name="tags" placeholder="e.g. 4567" autocomplete="off">','several of the same sex? separate with commas')+
      '<div class="two">'+fld('Sex','<select name="sexI">'+opts(['Female','Male','Unknown'],'Female')+'</select>')+'<div data-for="bought existing">'+fld('Birth date','<input type="date" name="birthI">','if known')+'</div></div>'+
-     '<div data-for="born existing" class="stack"><div class="two">'+fld('Mother','<select name="mother"></select>')+fld('Father','<select name="father"></select>')+'</div><div class="warnbox relwarn" hidden></div></div>'+
+     '<div data-for="born existing" class="stack"><div class="two">'+fld('Dam (mother)','<select name="mother"></select>')+fld('Sire (father)','<select name="father"></select>')+'</div><div class="warnbox relwarn" hidden></div></div>'+
    '</div>'+
    '<div data-for="bought born existing" data-kind="group" class="stack" hidden><div class="two">'+fld('Group name','<input name="tagG" placeholder="e.g. Kids Oct">','optional')+fld('Sex','<select name="sexG">'+opts(['Mixed','Female','Male'],'Mixed')+'</select>')+'</div>'+fld('How many','<input name="qtyNew" type="number" min="1" inputmode="numeric" value="1">')+'</div>'+
    '<div data-for="sold eaten died" class="stack" hidden>'+fld('Which animal','<select name="animalId">'+animalOpts+'</select>')+'<div id="qtyOutWrap">'+fld('How many','<input name="qtyOut" type="number" min="1" inputmode="numeric" value="1">')+'</div></div>'+
-   '<div data-for="bought sold"><div class="two">'+fld('Total price','<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">')+fld('<span id="whoL">Seller</span>','<input name="who">')+'</div></div>'+
+   '<div data-for="bought sold"><div class="two">'+fld('Total price','<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">')+fld('<span id="whoL">Seller</span>','<input name="who">')+'</div>'+curBlock(null)+'</div>'+
    '<div id="wd" class="warnbox" hidden></div>'+
    fld('Notes','<input name="note" placeholder="Optional">')+
    '<button class="btn pri" type="submit">Save</button></form>';
@@ -1815,6 +1868,7 @@ function syncEvent(){
   });
   var w=document.getElementById('whoL');if(w)w.textContent=t==='sold'?'Buyer':'Seller';
   syncParents(f);
+  var sw=document.getElementById('subWrap');if(sw)sw.hidden=!(f.elements.species.value==='Chickens'&&['bought','born','existing'].indexOf(t)>=0);
   var box=document.getElementById('wd');box.hidden=true;
   var sa=aById(f.elements.animalId.value);
   var qo=document.getElementById('qtyOutWrap');if(qo)qo.hidden=!!(sa&&isInd(sa));
@@ -1851,7 +1905,7 @@ function fTx(pre){
   var cat=x?x.cat:(dir==='in'?'Animal sales':(pre.repeat?'Labour':'Feed'));
   return head(x?'Edit entry':'Add money in or out')+'<form data-form="tx" id="txForm">'+hid(x&&x.id)+
    '<div class="two">'+fld('Type','<select name="dir"><option value="out"'+(dir==='out'?' selected':'')+'>Spent</option><option value="in"'+(dir==='in'?' selected':'')+'>Received</option></select>')+fld('Date','<input type="date" name="date" value="'+(x?x.date:(pre.date||today()))+'" required>')+'</div>'+
-   '<div class="two">'+fld('Category','<select name="cat">'+opts(dir==='in'?INCATS:OUTCATS,cat)+'</select>')+fld('Amount (P)','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+(x?x.amount:'')+'">')+'</div>'+
+   '<div class="two">'+fld('Category','<select name="cat">'+opts(dir==='in'?INCATS:OUTCATS,cat)+'</select>')+fld('Amount','<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="'+(x?origOf(x):'')+'">')+'</div>'+curBlock(x)+
    fld('What for','<input name="item" placeholder="e.g. Lucerne bales, 20 bags" value="'+esc(x?x.item:'')+'">')+
    fld('<span id="spLbl">'+(dir==='in'?'Earned by':'Spent on')+'</span>','<select name="species">'+spOpts(dir,sp)+'</select>')+
    '<div class="stack" id="pickWrap">'+pickBlock(sp,sel)+'</div>'+
@@ -1880,14 +1934,15 @@ function fAnimal(pre){
   var ind=isInd(a);
   var tr=db.treatments.filter(function(t){return t.animalId?t.animalId===a.id:(t.target==='All'||t.target===a.species)}).sort(function(x,y){return x.date<y.date?1:-1}).slice(0,6);
   var kids=db.animals.filter(function(k){return k.motherId===a.id||k.fatherId===a.id});
-  var meta=[esc(a.species),ind?(a.sex!=='Unknown'?a.sex:''):a.qty+' head',SRC[a.source]||'',a.birth?ageStr(a.birth)+' old':'',a.status].filter(Boolean).join(' · ');
+  var meta=[esc(spLine(a)),ind?(a.sex!=='Unknown'?a.sex:''):a.qty+' head',SRC[a.source]||'',a.birth?ageStr(a.birth)+' old':'',a.status].filter(Boolean).join(' · ');
   var h=head(esc(aLabel(a)))+'<div class="small muted">'+meta+'</div>';
   if(ind){
-    h+='<h3>Family</h3><div class="stack">'+famRow('Mother',aById(a.motherId))+famRow('Father',aById(a.fatherId))+
+    h+='<h3>Family</h3><div class="stack">'+famRow('Dam (mother)',aById(a.motherId))+famRow('Sire (father)',aById(a.fatherId))+
       '<div class="row" style="align-items:flex-start"><span class="muted">Offspring ('+kids.length+')</span>'+(kids.length?'<div class="chips" style="justify-content:flex-end">'+kids.map(function(k){return '<button class="chip" data-a="animal" data-id="'+k.id+'">'+esc(aLabel(k))+'</button>'}).join('')+'</div>':'<span class="muted">None recorded</span>')+'</div></div>';
   }
   if(ind){var at=attrib(a.id);if(at.earned>0||at.spent>0)h+='<h3>Money</h3><div class="sum3"><div class="tile"><b class="num">'+money(at.earned)+'</b><span>Earned</span></div><div class="tile"><b class="num">'+money(at.spent)+'</b><span>Costs</span></div><div class="tile"><b class="num" style="color:var(--'+(at.earned-at.spent<0?'bad':'good')+')">'+money(at.earned-at.spent)+'</b><span>Net</span></div></div>'}
   h+='<h3>Recent treatments</h3>'+list(tr.map(function(t){var p=prod(t.productId);return '<div class="item"><div class="main"><div class="t">'+esc(p?p.name:'?')+'</div><div class="s">'+dshort(t.date)+(t.dose?' · '+esc(t.dose):'')+'</div></div></div>'}),'None logged.')+
+   (ind&&(kids.length||a.sex==='Female')?'<div class="row"><button class="btn" data-a="repro" data-id="'+a.id+'" style="flex:1">Breeding record</button></div>':'')+
    '<div class="row"><button class="btn" data-a="animaledit" data-id="'+a.id+'" style="flex:1">Edit</button><button class="btn" data-a="treatfor" data-id="'+a.id+'" style="flex:1">Log treatment</button></div>'+
    rmBlock('animals',a.id,'record');
   return h;
@@ -1898,10 +1953,100 @@ function fAnimalEdit(pre){
   return head('Edit '+esc(aLabel(a)))+'<form data-form="animalEdit" id="aeForm" data-self="'+a.id+'">'+hid(a.id)+
    fld(ind?'Tag number':'Group name','<input name="tag" value="'+esc(a.tag)+'" autocomplete="off">')+
    '<div class="two">'+fld('Species','<select name="species">'+opts(SPECIES,a.species)+'</select>')+fld('Sex','<select name="sex">'+opts(ind?['Female','Male','Unknown']:['Mixed','Female','Male'],a.sex)+'</select>')+'</div>'+
-   (ind?fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional'):'<div class="two">'+fld('How many','<input name="qty" type="number" min="1" inputmode="numeric" value="'+a.qty+'">')+fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional')+'</div>')+
-   (ind?'<div class="two">'+fld('Mother','<select name="mother">'+parentChoices(a.species,'Female',a,a.motherId)+'</select>')+fld('Father','<select name="father">'+parentChoices(a.species,'Male',a,a.fatherId)+'</select>')+'</div><div class="warnbox relwarn" hidden></div>':'')+
+   fld('Kind of chicken','<select name="sub">'+opts([['','Not set']].concat(CHKIND.map(function(k){return [k,k]})),a.sub||'')+'</select>','chickens only')+(ind?fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional'):'<div class="two">'+fld('How many','<input name="qty" type="number" min="1" inputmode="numeric" value="'+a.qty+'">')+fld('Birth date','<input type="date" name="birth" value="'+esc(a.birth)+'">','optional')+'</div>')+
+   (ind?'<div class="two">'+fld('Dam (mother)','<select name="mother">'+parentChoices(a.species,'Female',a,a.motherId)+'</select>')+fld('Sire (father)','<select name="father">'+parentChoices(a.species,'Male',a,a.fatherId)+'</select>')+'</div><div class="warnbox relwarn" hidden></div>':'')+
    fld('Status','<select name="status">'+opts([['active','On the farm'],['sold','Sold'],['eaten','Eaten at home'],['died','Died']],a.status)+'</select>','to record a sale with money, use Animal event')+
    '<button class="btn pri" type="submit">Save changes</button></form>';
+}
+
+
+/* breeding record */
+function kidsOfParent(a){return db.animals.filter(function(k){return a.sex==='Male'?k.fatherId===a.id:k.motherId===a.id})}
+function reproSpecies(){return SPECIES.filter(function(s){return db.animals.some(function(a){return isInd(a)&&a.species===s&&(a.sex==='Female'||a.sex==='Male')})})}
+function reproRows(sp,role){
+  var sex=role==='sire'?'Male':'Female';
+  return db.animals.filter(function(a){return isInd(a)&&a.species===sp&&a.sex===sex}).map(function(a){
+    var ks=kidsOfParent(a),c={alive:0,sold:0,eaten:0,died:0};
+    ks.forEach(function(k){c[k.status==='active'?'alive':k.status]++});
+    return {a:a,n:ks.length,alive:c.alive,sold:c.sold,eaten:c.eaten,died:c.died};
+  }).sort(function(x,y){return y.n-x.n||y.alive-x.alive||x.died-y.died||String(x.a.tag).localeCompare(String(y.a.tag))});
+}
+function reproPill(r){
+  if(!r.n)return '<span class="pill">none yet</span>';
+  if(r.died===0)return '<span class="pill good">none lost</span>';
+  if(r.died===r.n)return '<span class="pill bad">all died</span>';
+  return '<span class="pill warn">'+r.died+' died</span>';
+}
+function cRepro(){
+  var h='<div class="card"><div class="sec"><h2>Best breeders</h2></div>';
+  var sps=reproSpecies();
+  if(!sps.length)return h+'<div class="empty">Add animals one by one with a tag, and choose the dam (mother) and sire (father) when young are born. The best breeders then show here.</div></div>';
+  if(sps.indexOf(reproSp)<0){
+    var best=sps.map(function(s){var n=0;db.animals.forEach(function(a){if(isInd(a)&&a.species===s&&a.motherId)n++});return {s:s,n:n}}).sort(function(x,y){return y.n-x.n})[0];
+    reproSp=best.s;
+  }
+  var rows=reproRows(reproSp,reproRole),bred=rows.filter(function(r){return r.n>0}),top=reproN?bred.slice(0,reproN):bred;
+  var none=rows.filter(function(r){return !r.n&&r.a.status==='active'&&(!r.a.birth||diff(r.a.birth,today())>=365)});
+  h+='<div class="chips">'+sps.map(function(s){return '<button class="chip" aria-pressed="'+(reproSp===s)+'" data-a="reprosp" data-v="'+s+'">'+s+'</button>'}).join('')+'</div>';
+  h+='<div class="chips"><button class="chip" aria-pressed="'+(reproRole==='dam')+'" data-a="reprorole" data-v="dam">Dams (mothers)</button><button class="chip" aria-pressed="'+(reproRole==='sire')+'" data-a="reprorole" data-v="sire">Sires (fathers)</button>'+
+    [[5,'Top 5'],[10,'Top 10'],[0,'All']].map(function(o){return '<button class="chip" aria-pressed="'+(reproN===o[0])+'" data-a="repron" data-v="'+o[0]+'">'+o[1]+'</button>'}).join('')+'</div>';
+  if(!top.length)h+='<div class="empty">No young recorded yet for '+esc(reproSp.toLowerCase())+'. When you add a newborn, pick its dam (mother) and sire (father).</div>';
+  else h+='<div class="tw"><table class="t"><thead><tr><th>#</th><th>'+(reproRole==='sire'?'Sire':'Dam')+'</th><th class="r">Young</th><th class="r">Alive</th><th class="r">Died</th><th></th></tr></thead><tbody>'+
+    top.map(function(r,i){return '<tr class="clk" data-a="repro" data-id="'+r.a.id+'"><td>'+(i+1)+'</td><td><button class="lnk" data-a="repro" data-id="'+r.a.id+'">'+esc(r.a.tag)+'</button>'+(r.a.status!=='active'?' <span class="pill">'+r.a.status+'</span>':'')+'</td><td class="r num"><b>'+r.n+'</b></td><td class="r num">'+r.alive+'</td><td class="r num">'+r.died+'</td><td>'+reproPill(r)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  if(none.length)h+='<div class="stack"><span class="small muted">Over a year old with no young recorded ('+none.length+'). Tap one to see its record.</span><div class="chips">'+none.map(function(r){return '<button class="chip" data-a="repro" data-id="'+r.a.id+'">'+esc(r.a.tag)+'</button>'}).join('')+'</div></div>';
+  h+='<div class="small muted">Ranked by how many young each has had. Tap one to see how its young did over the years. Only young added one by one with a tag, and linked to their parent, are counted here, not groups.</div></div>';
+  return h;
+}
+function reproChart(kids){
+  var ds=kids.filter(function(k){return k.birth&&k.birth<=today()}).sort(function(a,b){return a.birth<b.birth?-1:a.birth>b.birth?1:0});
+  if(!ds.length)return '<div class="empty">The young have no birth dates yet, so there is nothing to draw. Add a birth date to each one.</div>';
+  var t=today(),rs=addDays(ds[0].birth,-90),span=Math.max(30,diff(rs,t)),w=isWide(),W=w?560:340,H=210,L=30,R=14,T=14,B=26,ym=Math.max(1,ds.length);
+  function X(d){return r1(L+diff(rs,d)/span*(W-L-R))}
+  function Y(v){return r1(T+(1-v/ym)*(H-T-B))}
+  var g='',step=Math.max(1,Math.ceil(ym/5));
+  for(var v=0;v<=ym;v+=step)g+='<line class="gl" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text x="'+(L-6)+'" y="'+(Y(v)+3.5)+'" text-anchor="end">'+v+'</text>';
+  var mid=addDays(rs,Math.round(span/2));
+  g+='<text x="'+L+'" y="'+(H-6)+'" text-anchor="start">'+dshort(rs)+'</text><text x="'+X(mid)+'" y="'+(H-6)+'" text-anchor="middle">'+dshort(mid)+'</text><text x="'+(W-R)+'" y="'+(H-6)+'" text-anchor="end">'+dshort(t)+'</text>';
+  var d='M'+X(rs)+' '+Y(0);
+  ds.forEach(function(k,i){d+=' H'+X(k.birth)+' V'+Y(i+1)});
+  d+=' H'+X(t);
+  g+='<path d="'+d+'" fill="none" style="stroke:var(--s1)" stroke-width="2" stroke-linejoin="round"/>';
+  ds.forEach(function(k,i){
+    var col=k.status==='active'?'--good':k.status==='died'?'--bad':'--warn';
+    g+='<circle cx="'+X(k.birth)+'" cy="'+Y(i+1)+'" r="5" stroke-width="2" style="fill:var('+col+');stroke:var(--surface)"><title>'+esc(aLabel(k))+', born '+dshort(k.birth)+' ('+(k.status==='active'?'alive':k.status)+')</title></circle>';
+  });
+  return '<div class="chartwrap"><svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Young born over time, one dot for each">'+g+'</svg></div>'+
+    '<div class="keys small"><span><i class="sw" style="background:var(--good)"></i>Alive</span><span><i class="sw" style="background:var(--bad)"></i>Died</span><span><i class="sw" style="background:var(--warn)"></i>Sold or eaten</span></div>';
+}
+function reproVerdict(a,ks){
+  var role=a.sex==='Male'?'sire':'dam',n=ks.length;
+  if(!n)return a.sex==='Male'||a.sex==='Female'?'No young recorded for this '+role+' yet.':'';
+  var died=ks.filter(function(k){return k.status==='died'}).length,al=ks.filter(function(k){return k.status==='active'}).length;
+  var dated=ks.filter(function(k){return k.birth}).sort(function(x,y){return x.birth<y.birth?-1:1});
+  var rate='';
+  if(dated.length>=2){var yrs=diff(dated[0].birth,dated[dated.length-1].birth)/365.25;if(yrs>0.2)rate=' About '+r1((dated.length-1)/yrs)+' young a year between the first and the last.'}
+  if(died===0)return n+' young recorded and none have died.'+rate;
+  if(died===n)return 'All '+n+' young died.'+rate;
+  return n+' young recorded: '+al+' alive and '+died+' died.'+rate;
+}
+function fRepro(pre){
+  var a=aById(pre.id);if(!a||!isInd(a))return '';
+  var ks=kidsOfParent(a),al=ks.filter(function(k){return k.status==='active'}).length,dd=ks.filter(function(k){return k.status==='died'}).length;
+  var role=a.sex==='Male'?'Sire (father)':'Dam (mother)';
+  var h=head(esc(aLabel(a))+' breeding record')+'<div class="small muted">'+esc(spLine(a))+' · '+role+(a.status!=='active'?' · '+a.status:'')+'</div>';
+  h+='<div class="sum3"><div class="tile"><b class="num">'+ks.length+'</b><span>Young</span></div><div class="tile"><b class="num">'+al+'</b><span>Alive</span></div><div class="tile"><b class="num" style="color:var(--'+(dd?'bad':'good')+')">'+dd+'</b><span>Died</span></div></div>';
+  var vd=reproVerdict(a,ks);if(vd)h+='<p>'+esc(vd)+'</p>';
+  if(ks.length){
+    h+='<h3>Young over time</h3>'+reproChart(ks);
+    var by={};ks.forEach(function(k){var y=k.birth?k.birth.slice(0,4):'No date';var r=by[y]||(by[y]={n:0,al:0,dd:0,ot:0});r.n++;if(k.status==='active')r.al++;else if(k.status==='died')r.dd++;else r.ot++});
+    var ys=Object.keys(by).sort();
+    h+='<h3>Year by year</h3><div class="tw"><table class="t"><thead><tr><th>Year</th><th class="r">Born</th><th class="r">Alive</th><th class="r">Died</th><th class="r">Sold or eaten</th></tr></thead><tbody>'+ys.map(function(y){var r=by[y];return '<tr><td>'+y+'</td><td class="r num">'+r.n+'</td><td class="r num">'+r.al+'</td><td class="r num">'+r.dd+'</td><td class="r num">'+r.ot+'</td></tr>'}).join('')+'</tbody></table></div>';
+    h+='<h3>Young</h3><div class="chips">'+ks.slice().sort(function(x,y){return (x.birth||'')<(y.birth||'')?-1:1}).map(function(k){return '<button class="chip" data-a="animal" data-id="'+k.id+'">'+esc(aLabel(k))+(k.status!=='active'?' ('+k.status+')':'')+'</button>'}).join('')+'</div>';
+  }
+  var at=attrib(a.id);
+  if(at.earned>0||at.spent>0)h+='<h3>Money</h3><div class="sum3"><div class="tile"><b class="num">'+money(at.earned)+'</b><span>Earned</span></div><div class="tile"><b class="num">'+money(at.spent)+'</b><span>Costs</span></div><div class="tile"><b class="num" style="color:var(--'+(at.earned-at.spent<0?'bad':'good')+')">'+money(at.earned-at.spent)+'</b><span>Net</span></div></div>';
+  h+='<div class="row"><button class="btn" data-a="animal" data-id="'+a.id+'" style="flex:1">Open animal record</button></div>';
+  return h;
 }
 
 /* calendar */
@@ -1937,7 +2082,7 @@ function calBody(){
   else{
     var sd=st[calDay], dl=due[calDay]||[], nd=sd?sd['in']-sd.out:0;
     h+='<div class="stack"><div class="sec"><h3>'+dlong(calDay)+'</h3>'+(sd?'<b class="num" style="color:var(--'+(nd<0?'bad':'good')+')">'+(nd>0?'+':'')+money(nd)+'</b>':'')+'</div>';
-    if(sd)h+=list(sd.items.map(function(x){return '<div class="item"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></div>'}),'');
+    if(sd)h+=list(sd.items.map(function(x){return '<div class="item"><div class="main"><div class="t">'+esc(x.item||x.cat)+'</div><div class="s">'+esc(x.cat)+(x.species?' · '+esc(x.species):'')+(x.supplier?' · '+esc(x.supplier):'')+(x.recId?' · repeating':'')+(x.cur==='ZAR'?' · '+esc(curNote(x)):'')+'</div></div><b class="num" style="color:var(--'+(x.dir==='in'?'good':'fg')+')">'+(x.dir==='in'?'+':'')+money(x.amount)+'</b></div>'}),'');
     else h+='<div class="empty">Nothing recorded on this day.</div>';
     dl.forEach(function(s){var p=prod(s.productId);h+='<div class="item"><div class="main"><div class="t">Due: '+esc(p?p.name:'?')+' · '+esc(s.target)+'</div><div class="s">'+esc(s.dose||'')+'</div></div><span class="pill warn">Health</span></div>'});
     h+='<button class="btn sm" data-a="caladd" style="align-self:flex-start">Add an entry on this day</button></div>';
@@ -1953,7 +2098,7 @@ function openSheet(kind,pre){
   if(kind==='import')impStart('animals');
   if(kind==='scan')scanStart();
   if(kind==='cal'){calMonth=today().slice(0,7);calDay=today()}
-  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport,scan:fScan}[kind](cur.pre);
+  var html={treat:fTreat,sched:fSched,event:fEvent,tx:fTx,animal:fAnimal,animalEdit:fAnimalEdit,rec:fRec,cal:fCal,slice:fSlice,import:fImport,scan:fScan,repro:fRepro}[kind](cur.pre);
   if(!html){cur=null;return}
   var host=document.getElementById('sheetHost');
   host.innerHTML='<div class="scrim" data-a="scrim"><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
@@ -1991,18 +2136,19 @@ var forms={
   var animalId='',target=f.target;
   if(target.indexOf('an:')===0){animalId=target.slice(3);var an=aById(animalId);target=an?an.species:'All'}
   var p=findProduct(name,f.type,wdv), cost=+f.cost||0, wd=wdv===null?p.withdrawal:wdv;
+  var cm=cost>0?cmeta(f,cost):{amount:0,cur:''};if(cm.err)return E(cm.err);cost=cm.amount;
   if(f._id){
     var t=db.treatments.find(function(x){return x.id===f._id});if(!t)return E('That entry no longer exists.');
     linkLegacy(t);
     var oldP=t.productId,oldT=t.target;
     t.date=f.date;t.productId=p.id;t.target=target;t.animalId=animalId;t.dose=f.dose.trim();t.note=f.note.trim();t.withdrawal=wd;
-    syncTreatCost(t,cost,p.name);
+    syncTreatCost(t,cost,p.name,cm);
     recalcSchedule(oldP,oldT);recalcSchedule(p.id,target);
     return;
   }
   var nt={id:uid(),date:f.date,productId:p.id,target:target,animalId:animalId,dose:f.dose.trim(),cost:0,note:f.note.trim(),withdrawal:wd,txId:''};
   db.treatments.push(nt);
-  syncTreatCost(nt,cost,p.name);
+  syncTreatCost(nt,cost,p.name,cm);
   if(!animalId){
     var s=db.schedules.find(function(x){return x.productId===p.id&&x.target===target});
     if(s){s.last=f.date;s.next=addDays(f.date,s.interval);if(f.dose.trim())s.dose=f.dose.trim()}
@@ -2023,13 +2169,14 @@ var forms={
  },
  tx:function(f){
   var amt=+f.amount;if(!(amt>0))return E('Enter an amount above 0.');
+  var cm=cmeta(f,amt);if(cm.err)return E(cm.err);amt=cm.amount;
   var sp=f.species||'',picks=[].concat(f.pick||[]).filter(Boolean).filter(function(id){var a=aById(id);return a&&a.species===sp});
   if(f.dir==='in'&&NEEDSP.indexOf(f.cat)>=0&&!sp)return E('Choose which type of animal this came from.');
   if(!sp)picks=[];
   if(f._id){
     var x=db.tx.find(function(r){return r.id===f._id});if(!x)return E('That entry no longer exists.');
-    x.date=f.date;x.dir=f.dir;x.cat=f.cat;x.amount=amt;x.item=f.item.trim();x.supplier=f.supplier.trim();x.species=sp;x.animalIds=picks;
-    db.treatments.forEach(function(t){if(t.txId===x.id)t.cost=amt});
+    x.date=f.date;x.dir=f.dir;x.cat=f.cat;setCur(x,cm);x.item=f.item.trim();x.supplier=f.supplier.trim();x.species=sp;x.animalIds=picks;
+    db.treatments.forEach(function(t){if(t.txId===x.id)setCur(t,cm,'cost')});
     return;
   }
   if(f.dir==='out'&&f.repeat&&f.repeat!=='none'){
@@ -2037,7 +2184,7 @@ var forms={
     runRecurring();
     return {msg:'Repeating cost saved: '+FREQ[f.repeat].toLowerCase()+', from '+dshort(f.date)+'.'};
   }
-  db.tx.push({id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),note:'',species:sp,animalIds:picks});
+  var nx={id:uid(),date:f.date,dir:f.dir,cat:f.cat,amount:amt,item:f.item.trim(),supplier:f.supplier.trim(),note:'',species:sp,animalIds:picks};setCur(nx,cm);db.tx.push(nx);
  },
  rec:function(f){
   var r=db.recurring.find(function(x){return x.id===f._id});if(!r)return E('That repeating cost no longer exists.');
@@ -2055,7 +2202,7 @@ var forms={
   var ind=isInd(a),tag=f.tag.trim();
   if(ind&&!tag)return E('A tag number is needed.');
   if(tag&&tagTaken(tag,a.id))return E('The tag '+tag+' is already used by another animal.');
-  a.tag=tag;a.species=f.species;a.sex=f.sex;a.birth=f.birth||'';a.status=f.status;
+  a.tag=tag;a.species=f.species;a.sub=f.species==='Chickens'?(f.sub||''):'';a.sex=f.sex;a.birth=f.birth||'';a.status=f.status;
   if(ind){
     a.motherId=f.mother||'';a.fatherId=f.father||'';
     var mo=aById(a.motherId),fa=aById(a.fatherId);
@@ -2065,8 +2212,9 @@ var forms={
  },
  event:function(f){
   var t=f.type,price=+f.price||0;
+  var cm=price>0&&(t==='bought'||t==='sold')?cmeta(f,price):{amount:(t==='bought'||t==='sold')?price:0,cur:''};if(cm.err)return E(cm.err);price=cm.amount;
   if(t==='bought'||t==='born'||t==='existing'){
-    var sp=f.species,q,note=f.note.trim(),newIds=[];
+    var sp=f.species,q,note=f.note.trim(),newIds=[],sub=sp==='Chickens'?(f.sub||''):'';
     if(f.kind==='individual'){
       var tags=String(f.tags||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
       if(!tags.length)return E('Enter a tag number for the animal.');
@@ -2078,20 +2226,20 @@ var forms={
         if(tagTaken(tags[i]))return E('The tag '+tags[i]+' is already used by another animal.');
       }
       var withParents=(t==='born'||t==='existing');
-      tags.forEach(function(tg){var nid=uid();newIds.push(nid);db.animals.push({id:nid,tag:tg,species:sp,sex:f.sexI,qty:1,source:t,birth:t==='born'?f.date:(f.birthI||''),status:'active',kind:'individual',motherId:withParents?(f.mother||''):'',fatherId:withParents?(f.father||''):''})});
+      tags.forEach(function(tg){var nid=uid();newIds.push(nid);db.animals.push({id:nid,tag:tg,species:sp,sex:f.sexI,qty:1,source:t,birth:t==='born'?f.date:(f.birthI||''),status:'active',kind:'individual',sub:sub,motherId:withParents?(f.mother||''):'',fatherId:withParents?(f.father||''):''})});
       q=tags.length;if(!note)note=tags.join(', ');
     }else{
       q=Math.max(1,parseInt(f.qtyNew,10)||1);
-      db.animals.push({id:uid(),tag:f.tagG.trim(),species:sp,sex:f.sexG,qty:q,source:t,birth:t==='born'?f.date:'',status:'active',kind:'group',motherId:'',fatherId:''});
+      db.animals.push({id:uid(),tag:f.tagG.trim(),species:sp,sex:f.sexG,qty:q,source:t,birth:t==='born'?f.date:'',status:'active',kind:'group',sub:sub,motherId:'',fatherId:''});
     }
     db.stock.push({id:uid(),date:f.date,type:t,species:sp,qty:q,who:t==='bought'?(f.who||''):'',price:t==='bought'?price:0,note:note});
-    if(t==='bought'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+sp.toLowerCase(),supplier:f.who||'',note:'',species:sp,animalIds:newIds});
+    if(t==='bought'&&price>0){var bx={id:uid(),date:f.date,dir:'out',cat:'Animals',amount:price,item:q+' '+sp.toLowerCase(),supplier:f.who||'',note:'',species:sp,animalIds:newIds};setCur(bx,cm);db.tx.push(bx)}
   }else{
     var a=aById(f.animalId);if(!a)return E('Choose an animal first.');
     var q2=isInd(a)?1:Math.max(1,Math.min(a.qty,parseInt(f.qtyOut,10)||1));
     a.qty-=q2;if(a.qty<=0){a.qty=q2;a.status=t}
     db.stock.push({id:uid(),date:f.date,type:t,species:a.species,qty:q2,who:f.who||'',price:t==='sold'?price:0,note:f.note.trim()||(isInd(a)?a.tag:'')});
-    if(t==='sold'&&price>0)db.tx.push({id:uid(),date:f.date,dir:'in',cat:'Animal sales',amount:price,item:(isInd(a)?a.tag:q2+' '+a.species.toLowerCase())+' sold',supplier:f.who||'',note:'',species:a.species,animalIds:isInd(a)?[a.id]:[]});
+    if(t==='sold'&&price>0){var sx={id:uid(),date:f.date,dir:'in',cat:'Animal sales',amount:price,item:(isInd(a)?a.tag:q2+' '+a.species.toLowerCase())+' sold',supplier:f.who||'',note:'',species:a.species,animalIds:isInd(a)?[a.id]:[]};setCur(sx,cm);db.tx.push(sx)}
   }
  }
 };
@@ -2119,6 +2267,10 @@ var actions={
  split:function(){splitShared=!splitShared;render()},
  poprange:function(d){popRange=d.v;render()},
  poptog:function(d){popHide[d.v]=!popHide[d.v];render()},
+ repro:function(d){openSheet('repro',{id:d.id})},
+ reprosp:function(d){reproSp=d.v;render()},
+ reprorole:function(d){reproRole=d.v;render()},
+ repron:function(d){reproN=+d.v;render()},
  calprev:function(){shiftMonth(-1);renderCal()},
  calnext:function(){shiftMonth(1);renderCal()},
  calday:function(d){calDay=d.d;renderCal()},
@@ -2245,8 +2397,9 @@ document.addEventListener('change',function(e){
   }
   if(el.id==='impFile'&&el.files&&el.files[0]){var r=new FileReader();r.onload=function(){doImport(r.result)};r.onerror=function(){toast('Could not read that file.')};r.readAsText(el.files[0]);return}
   var form=el.form;if(!form)return;
+  if(el.name==='cur'||el.name==='rate')updCur(form);
   if(form.id==='evForm'){
-    if(el.name==='species')form.elements.kind.value=el.value==='Chickens'?'group':'individual';
+    if(el.name==='species')form.elements.kind.value=POULTRY.indexOf(el.value)>=0?'group':'individual';
     syncEvent();
   }
   if(form.id==='aeForm'&&/^(species|mother|father)$/.test(el.name))syncParents(form);
@@ -2255,6 +2408,7 @@ document.addEventListener('change',function(e){
     if(el.name==='repeat'){var hn=document.getElementById('repHint');if(hn)hn.hidden=(el.value==='none')}
   }
 });
+document.addEventListener('input',function(e){var el=e.target,f=el&&el.form;if(f&&/^(amount|price|cost|rate)$/.test(el.name))updCur(f)});
 document.addEventListener('pointermove',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 document.addEventListener('pointerdown',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 try{var mq=window.matchMedia('(min-width: 900px)');var onmq=function(){render()};if(mq.addEventListener)mq.addEventListener('change',onmq);else if(mq.addListener)mq.addListener(onmq)}catch(e){}

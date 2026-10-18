@@ -1,35 +1,28 @@
 # CHELETE Farm Book
 
-A simple app for keeping farm records on your phone: animal numbers, vaccination and dip schedules, feed purchases and spending. It works offline once opened and can be installed on a phone's home screen.
+A simple app for keeping farm records on your phone or laptop: animal numbers, vaccination and dip schedules, feed and spending, breeding records and profit per animal type. It works offline once opened and can be installed on a phone's home screen.
 
 ## Use it
 
 Open the app link in Chrome on your phone, tap the menu, then **Add to Home screen**.
 
-Your records are saved on your own phone only. Use **Backup > Share backup** now and then and send the file to yourself on WhatsApp or email.
+Your records are saved on your own device. Sign in under **Backup** to keep a cloud copy, or use **Copy backup** now and then.
 
 ## Features
 
-- Animal registry: single animals with their own tag and recorded mother and father, or groups counted together
-- Bought, born, already-on-the-farm, sold, eaten and died events
-- Vaccine, dewormer and dip schedules with due dates and a withdrawal-period warning
-- Feed purchases with an early/late rhythm check
-- Spending by category, sales and net per month, with repeating costs (wages, feed) added automatically
-- Calendar showing money in and out for each day, with due treatments marked
-- Every income and cost can be tagged to an animal type, and to the specific tagged animals (a sold animal, or the cows a batch of milk came from)
-- Pie charts of spending by category and income by animal type; tap a slice for a breakdown
-- Profit per animal type, and a line chart of animal numbers over time
-- On a laptop or tablet the app shows a fuller dashboard automatically; the phone layout stays simple
-- Edit or remove any entry
-- Cloud backup with Firebase: sign in with Google or email, automatic backup after changes, restore on any phone (rules in firestore.rules)
-- Export everything to Excel (.xlsx), and make a printable PDF report for any period
-- Import animals or money from Excel, CSV or pasted rows, with column matching, a preview and an undo
-- Scan a receipt or invoice with Gemini (Firebase AI Logic): date, shop and items are read for you to check and correct before saving; shops are remembered
-- Share a backup to WhatsApp, email or Drive, weekly calendar reminder, and restore on any phone
+- Animals: cattle, goats, sheep, pigs, horses, donkeys, chickens, ducks, turkeys, rabbits and other. Record one by one with a tag, or as a group.
+- Chickens can be marked as layers, broilers or English chickens (the plain white ones), with a count for each kind.
+- Dam (mother) and sire (father) for animals born on the farm.
+- Best breeders: top 5, top 10 or all dams and sires per species, ranked by young born. Tap one to see a line chart of its young over time, how many lived or died, and a year-by-year table.
+- Pula (P) is the main currency. When you log a purchase, sale, expense or treatment you can choose South African rand (R) and enter the rate. The app saves the value in pula so every total stays in one currency, and remembers the last rate you used.
+- Vaccine, dewormer and dip schedules with due dates and withdrawal-period warnings
+- Repeating costs, calendar with profit and loss per day, profit per animal type, charts
+- Excel and CSV import, Excel and PDF export, receipt scanning, cloud backup
 
-## Feedback
+## Notes
 
-Please open an issue on this repository, or message the maintainer, and say what was confusing or missing.
+- Receipt scanning and spreadsheet import still read amounts as pula.
+- Breeding records only count young that were added one by one with a tag and linked to their dam or sire.
 
 ## Files
 
