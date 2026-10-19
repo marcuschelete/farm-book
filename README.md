@@ -40,3 +40,7 @@ Your records are saved on your own device. Sign in under **Backup** to keep a cl
 
 - Animals have an optional **Owner**, for farms where several people keep animals together. A filter row on the Animals tab shows one owner's animals at a time. A newborn gets its mother's owner unless you type another.
 - Excel import and export have an Owner column, and import has a new **Weights** page (date, animal tag, what, amount, unit).
+
+## Treating chosen animals
+
+In Health, + Log, set Given to "Choose animals...". Filter by type, search, and tick any animals from any type. Each ticked animal gets its own treatment record with the same product, dose, withdrawal and notes, so each animal's history is complete. A cost is counted once. "Give again in (days)" adds a task.

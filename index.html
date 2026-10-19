@@ -186,6 +186,8 @@ table.t tr.clk:hover{background:var(--soft)}
 .sh:focus-visible,.lnk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
 .picks{display:flex;flex-wrap:wrap;gap:6px}
+.pickl{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;padding:2px}
+.pickl .pick{border-radius:10px;font-weight:500}
 .pick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:6px 12px;cursor:pointer;font-weight:600;font-size:.9rem}
 .pick input{width:auto;min-height:0;margin:0}
 .pick:has(input:checked){background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
@@ -2275,6 +2277,22 @@ function targetOpts(sel,selAnimalId){
 }
 function plist(){return '<datalist id="plist">'+db.products.map(function(x){return '<option value="'+esc(x.name)+'">'}).join('')+'</datalist>'}
 
+function animalPicker(){
+  var an=db.animals.filter(function(a){return a.status==='active'}),sps=SPECIES.filter(function(x){return an.some(function(a){return a.species===x})});
+  if(!an.length)return '<div id="pickWrap" hidden class="small muted">Add some animals first.</div>';
+  return '<div id="pickWrap" hidden class="stack"><div class="chips">'+['All'].concat(sps).map(function(x){return '<button type="button" class="chip" aria-pressed="'+(x==='All')+'" data-a="pickf" data-v="'+x+'">'+(x==='All'?'':ic(x))+x+'</button>'}).join('')+'</div>'+
+   '<input type="search" class="sbox" id="pickQ" placeholder="Search by tag, name, breed or camp" autocomplete="off" aria-label="Search animals">'+
+   '<div class="row"><button type="button" class="btn sm" data-a="pickall">Select all shown</button><button type="button" class="btn sm" data-a="pickclr">Clear</button><span class="small muted" id="pickN">0 selected</span></div>'+
+   '<div class="pickl" id="pickL">'+an.map(function(a){return '<label class="pick" data-sp="'+a.species+'" data-q="'+esc([a.tag,a.name,a.camp,a.breed,a.owner,a.species].join(' ').toLowerCase())+'"><input type="checkbox" name="pick" value="'+a.id+'"><span>'+ic(a.species)+esc(aFull(a))+(a.kind==='group'?' ('+a.qty+')':'')+'</span></label>'}).join('')+'</div>'+
+   '<div class="small muted">Tick as many as you like, from any type. All of them get the same product, dose and notes.</div></div>';
+}
+function pickApply(){
+  var w=document.getElementById('pickWrap');if(!w)return;
+  var chip=w.querySelector('.chip[aria-pressed="true"]'),sp=chip?chip.dataset.v:'All',q=((document.getElementById('pickQ')||{}).value||'').trim().toLowerCase();
+  w.querySelectorAll('#pickL .pick').forEach(function(l){l.style.display=((sp==='All'||l.dataset.sp===sp)&&(!q||l.dataset.q.indexOf(q)>=0))?'':'none'});
+  pickCount();
+}
+function pickCount(){var n=document.querySelectorAll('#pickL input:checked').length,e=document.getElementById('pickN');if(e)e.textContent=n+' selected'}
 function fTreat(pre){
   var t=pre.tid?db.treatments.find(function(x){return x.id===pre.tid}):null;
   if(pre.tid&&!t)return '';
@@ -2282,13 +2300,14 @@ function fTreat(pre){
   var p=t?prod(t.productId):(s?prod(s.productId):null);
   var sel=t?(t.animalId?'an:'+t.animalId:t.target):s?s.target:pre.animalId?'an:'+pre.animalId:'All';
   var selA=t?t.animalId:pre.animalId;
-  return head(t?'Edit treatment':'Log treatment')+'<form data-form="treat">'+hid(t&&t.id)+
+  return head(t?'Edit treatment':'Log treatment')+'<form data-form="treat" id="trForm">'+hid(t&&t.id)+
    fld('Date','<input type="date" name="date" value="'+(t?t.date:today())+'" required>')+
    fld('Product','<input name="product" list="plist" required placeholder="e.g. Ivermectin" value="'+esc(p?p.name:'')+'">')+plist()+
-   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('Given to','<select name="target">'+targetOpts(sel,selA)+'</select>')+'</div>'+
+   '<div class="two">'+fld('Type','<select name="type">'+opts(TYPES,p?p.type:'Vaccine')+'</select>')+fld('Given to','<select name="target">'+(t?'':'<option value="pick">Choose animals...</option>')+targetOpts(sel,selA)+'</select>')+'</div>'+(t?'':animalPicker())+
    '<div class="two">'+fld('Dose','<input name="dose" placeholder="2 ml per head" value="'+esc(t?t.dose:(s?s.dose:''))+'">')+fld('Withdrawal days','<input name="withdrawal" type="number" min="0" inputmode="numeric" value="'+(t?(t.withdrawal||0):(p?p.withdrawal:''))+'">','before slaughter or sale')+'</div>'+
    fld('Cost','<input name="cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="'+(t&&t.cost?origOf(t,'cost'):'')+'">','optional, counts as Health spending')+curBlock(t&&t.cost?t:null)+
-   fld('Notes','<input name="note" placeholder="Optional" value="'+esc(t?t.note:'')+'">')+
+   fld('Notes or reason','<input name="note" placeholder="e.g. Sick with pneumonia" value="'+esc(t?t.note:'')+'">')+
+   (t?'':fld('Give again in (days)','<input name="again" type="number" min="1" inputmode="numeric" placeholder="Optional">','adds a task so you remember'))+
    '<button class="btn pri" type="submit">'+(t?'Save changes':'Save treatment')+'</button></form>'+(t?rmBlock('treatments',t.id,'this treatment'):'');
 }
 function fSched(pre){
@@ -2763,7 +2782,13 @@ var forms={
  treat:function(f){
   var name=f.product.trim();if(!name)return E('Enter the product name.');
   var wdv=f.withdrawal===''?null:Math.max(0,+f.withdrawal||0);
+  var picks=[];
+  if(f.target==='pick'&&!f._id){
+    picks=[].concat(f.pick||[]).filter(function(i){return aById(i)});
+    if(!picks.length)return E('Tick at least one animal, or choose another option in Given to.');
+  }
   var animalId='',target=f.target;
+  if(picks.length)target='All';
   if(target.indexOf('an:')===0){animalId=target.slice(3);var an=aById(animalId);target=an?an.species:'All'}
   var p=findProduct(name,f.type,wdv), cost=+f.cost||0, wd=wdv===null?p.withdrawal:wdv;
   var cm=cost>0?cmeta(f,cost):{amount:0,cur:''};if(cm.err)return E(cm.err);cost=cm.amount;
@@ -2775,6 +2800,16 @@ var forms={
     syncTreatCost(t,cost,p.name,cm);
     recalcSchedule(oldP,oldT);recalcSchedule(p.id,target);
     return;
+  }
+  var again=Math.round(+f.again||0),label=picks.length?picks.map(function(i){return aLabel(aById(i))}).slice(0,4).join(', ')+(picks.length>4?' and '+(picks.length-4)+' more':''):(animalId?aLabel(aById(animalId)):(f.target==='All'?'all animals':target.toLowerCase()));
+  if(again>0)db.tasks.push({id:uid(),title:'Give '+p.name+' again: '+label,due:addDays(f.date,again),cat:'Livestock',who:'',done:false,note:f.note.trim(),repeat:'none'});
+  if(picks.length){
+    picks.forEach(function(id,i){
+      var a=aById(id),nt={id:uid(),date:f.date,productId:p.id,target:a.species,animalId:id,dose:f.dose.trim(),cost:0,note:f.note.trim(),withdrawal:wd,txId:''};
+      db.treatments.push(nt);
+      if(i===0&&cost>0)syncTreatCost(nt,cost,p.name+' ('+picks.length+' animals)',cm);
+    });
+    return {msg:'Saved for '+picks.length+' animal'+(picks.length>1?'s':'')+'.'+(again>0?' A task will remind you in '+again+' days.':'')};
   }
   var nt={id:uid(),date:f.date,productId:p.id,target:target,animalId:animalId,dose:f.dose.trim(),cost:0,note:f.note.trim(),withdrawal:wd,txId:''};
   db.treatments.push(nt);
@@ -2921,6 +2956,9 @@ var actions={
   save();render();
  },
  ics:function(){var r=icsBlob();if(!r.n){toast('Nothing to remind you about yet.');return}deliverFile('farm-book-reminders.ics',r.blob,function(){toast('Calendar file ready. Open it to add the reminders.')})},
+ pickf:function(d,el){var w=document.getElementById('pickWrap');if(!w)return;w.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-pressed',c.dataset.v===d.v?'true':'false')});pickApply()},
+ pickall:function(){document.querySelectorAll('#pickL .pick').forEach(function(l){if(l.style.display!=='none')l.querySelector('input').checked=true});pickCount()},
+ pickclr:function(){document.querySelectorAll('#pickL input').forEach(function(i){i.checked=false});pickCount()},
  campq:function(d){animalQ=d.v;flt='All';render();var el=document.getElementById('aSearch');if(el)el.scrollIntoView()},
  calprev:function(){shiftMonth(-1);renderCal()},
  calnext:function(){shiftMonth(1);renderCal()},
@@ -3061,6 +3099,7 @@ document.addEventListener('change',function(e){
     syncEvent();
   }
   if(form.id==='brForm')syncBreed(form,el.name);
+  if(form.id==='trForm'){if(el.name==='target'){var pw=document.getElementById('pickWrap');if(pw){pw.hidden=el.value!=='pick';if(!pw.hidden)pickApply()}}if(el.name==='pick')pickCount()}
   if(form.id==='prForm'&&el.name==='product'){form.elements.unit.value=PRODS[el.value]||'units'}
   if(form.id==='aeForm'&&/^(species|mother|father)$/.test(el.name))syncParents(form);
   if(form.id==='txForm'){
@@ -3076,7 +3115,7 @@ document.addEventListener('scroll',function(e){
 document.addEventListener('toggle',function(e){
   var d=e.target;if(imp&&imp.pages&&d&&d.tagName==='DETAILS'&&d.dataset&&d.dataset.k&&imp.pages[d.dataset.k])imp.pages[d.dataset.k].open=d.open;
 },true);
-document.addEventListener('input',function(e){var el=e.target;if(el&&el.id==='aSearch'){animalQ=el.value;var l=document.getElementById('aList');if(l)l.innerHTML=animalListHtml();return}var f=el&&el.form;if(f&&/^(amount|price|cost|rate)$/.test(el.name))updCur(f)});
+document.addEventListener('input',function(e){var el=e.target;if(el&&el.id==='pickQ'){pickApply();return}if(el&&el.id==='aSearch'){animalQ=el.value;var l=document.getElementById('aList');if(l)l.innerHTML=animalListHtml();return}var f=el&&el.form;if(f&&/^(amount|price|cost|rate)$/.test(el.name))updCur(f)});
 document.addEventListener('pointermove',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 document.addEventListener('pointerdown',function(e){var sv=e.target&&e.target.closest?e.target.closest('.popsvg'):null;if(sv)popHover(sv,e);else popOut()});
 try{var mq=window.matchMedia('(min-width: 900px)');var onmq=function(){render()};if(mq.addEventListener)mq.addEventListener('change',onmq);else if(mq.addListener)mq.addListener(onmq)}catch(e){}
