@@ -44,3 +44,7 @@ Your records are saved on your own device. Sign in under **Backup** to keep a cl
 ## Treating chosen animals
 
 In Health, + Log, set Given to "Choose animals...". Filter by type, search, and tick any animals from any type. Each ticked animal gets its own treatment record with the same product, dose, withdrawal and notes, so each animal's history is complete. A cost is counted once. "Give again in (days)" adds a task.
+
+## Look and feel
+
+Phone-first redesign: deep forest green with brass hairlines, serif headings and numerals (Fraunces), Manrope for text, soft cards, and a floating bottom bar. The centre button fans out a circular quick-add menu (Animal, Breeding, Treatment, Task, Produce, Money, Receipt). Work and Backup are the two icons at the top right on phones. The laptop layout keeps the sidebar and gets the same menu at bottom right; it will get its own pass later.
